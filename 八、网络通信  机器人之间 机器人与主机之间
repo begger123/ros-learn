@@ -1,0 +1,152 @@
+      1、同步时间
+          主机和机器人两边安装chrony 
+          chrony 会同步成网络服务器的时间
+          sudo apt-get install chrony   //同步网络时间
+          chrony 安装后会自动启动
+        2、局域网下  依据主机名(hostname)通信 Zeroconf
+          hostname
+          >>> ewenwan-Lenovo-G480
+          Zeroconf hostname 即为： ewenwan-Lenovo-G480.local
+          机器人那一端 my_robot.local
+          尝试链接
+          机器人端  ping ewenwan-Lenovo-G480.local
+          主机端    ping my_robot.local
+        
+         若出现 "unknown host" 错误   重启 avahi-daemon 进程
+         sudo service avahi-daemon restart
+        
+        3、ros主从机设置方法
+        ros网络只允许一个 roscore 出现 即ros主机 的roscore进程
+        其他都只能作为 从机 设置 ROS_MASTER_URI 环境变量 指向 ros 主机
+        一般设置机器人为 ros主机
+        设置为ros主机方法
+        机器人端（ros主机）：
+         export ROS_HOSTNAME=my_robot.local   //设置 ROS_HOSTNAME 环境变量为相应的主机名
+         roscore                              //运行roscore        
+         pc端ros从机：
+         export ROS_HOSTNAME=my_desktop.local  ////设置 ROS_HOSTNAME 环境变量为相应的主机名
+         export ROS_MASTER_URI=http://my_robot.local:11311    //设置 ROS_MASTER_URI 环境变量 指向 ros 主机
+         
+         4、同步時間
+         sudo ntpdate -b my_robot.local
+         在pc端ros从机： 查看话题列表
+         rostopic list
+         >>>>> 
+        /rosout             //此话题为 ros主机 roscore 运行 同步得到
+        /rosout_agg
+        
+        
+        5、将主从机设置到系统启动项中  ~/.bashrc
+          //加入到 ~/.bashrc最后
+         机器人端（ros主机）：
+         export ROS_HOSTNAME=my_robot.local   //设置 ROS_HOSTNAME 环境变量为相应的主机名
+         roscore                              //运行roscore        
+         pc端ros从机：
+         export ROS_HOSTNAME=my_desktop.local  ////设置 ROS_HOSTNAME 环境变量为相应的主机名
+         export ROS_MASTER_URI=http://my_robot.local:11311    //设置 ROS_MASTER_URI 环境变量
+        
+        
+        6、联机的多台ros系统 运行的node  都会在 单个 ros系统中查询到
+        
+        7、 pc端远程登录 机器人端
+            ssh my_robot.local
+            On the robot (via ssh):
+      export ROS_HOSTNAME=my_robot.local   //设置主机
+      roscore &                            //运行roscore  注意后面的 & 可以启动launch文件 不用再开一个 ssh登录
+      roslaunch my_robot startup.launch    //启动launch文件
+            
+            8、pc端启动
+              export ROS_HOSTNAME=my_desktop.local
+              export ROS_MASTER_URI=http://my_robot.local:11311     //设置链接的主机
+              rosrun rviz rviz -d `rospack find rbx1_nav`/nav.rviz  //打开3d可视化
+              
+        9、ros基本概念
+           一个节点通常发布传感器数据消息到话题上，也可以为其他节点提供服务（打开/关闭led灯 返回导航计划 返回位置信息）
+           例如 物体追踪节点  在一系列video话题上订阅 照片信息 经过处理 发布 移动控制命令 到相应的执行机构订阅的话题上
+           ros 数据测量  距离通常以 米 为单位  角度通常一弧度为单位  0~2*pi  代表0~360度
+    
+       
+  安装云端 软件仓库获取更新工具  SVN, Git, and Mercurial
+  
+           sudo apt-get install git subversion mercurial
+           1） SVN
+           获取软件包 svn checkout
+           cd ~/catkin_ws/src
+           svn checkout http://repository/svn/package_name
+           cd ~/catkin_ws
+           catkin_make
+           source devel/setup.bash
+           rospack profile
+
+          更新 svn update
+         cd ~/catkin_ws/src/package_name
+         svn update
+         cd ~/catkin_ws
+         catkin_make
+         source devel/setup.bash
+    2) Git
+          获取软件包 git clone
+           cd ~/catkin_ws/src
+           git clone git://repository/package_name
+           cd ~/catkin_ws
+           catkin_make
+           source devel/setup.bash
+           rospack profile
+       更新 git pull
+       cd ~/catkin_ws/src/package_name
+       git pull
+       cd ~/catkin_ws
+       catkin_make
+       source devel/setup.bash
+       
+       
+       3) Mercurial
+       获取 软件包 hg clone
+       cd ~/catkin_ws/src
+       hg clone http://repository/package_name
+       cd ~/catkin_ws
+       catkin_make
+       source devel/setup.bash
+       rospack profile
+       更新 hg update
+       cd ~/catkin_ws/src/package_name
+       hg update
+       cd ~/catkin_ws
+       catkin_make
+       source devel/setup.bash
+       
+       4) 移除软件包
+       移除某个
+     cd ~/catkin_ws/src
+     \rm -rf my_catkin_package
+     
+     移除catkin 编译以来环境
+           cd ~/catkin_ws
+       \rm -rf devel build install     //不能加入src（源文件包）
+       catkin_make
+       source devel/setup.bash
+       
+       
+       ros支持arduino的包
+       cd catkin_ws/src
+       git clone git://github.com/ros-drivers/rosserial.gitgit
+       cd catkin_ws
+       catkin_make
+       source devel/setup.bash
+       rospack profile
+       
+       人脸识别的包:
+       cd catkin_ws/src
+       git clone https://github.com/procrob/procrob_functional.git --branch catkin
+       cd ~/catkin_ws
+       catkin_make
+       source ~/catkin_ws/devel/setup.bash
+       
+       
+       训练数据 图像  data
+       训练数据 列表   train.text file     train.txt file(特殊格式 可以看懂的)  人序列 名字  照片
+       项目会训练一个人脸识别数据库 存放在  facedata.xml 文件里
+       
+       人脸检测使用 人脸检测数据库 haarcascade_frontalface_alt.xml
+       
+       
