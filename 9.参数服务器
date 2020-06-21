@@ -1,0 +1,302 @@
+	除 了 前 面 介 绍 过 的 消 息 传 递 , ROS 还 提 供 另 一 种 参 数
+	( parameters )机制用于获取节点的信息。其主要思想是使用集中
+	参数服务器( parameter server )维护一个变量集的值,包括整数、
+	浮点数、字符串以及其他数据类型,每一个变量用一个较短的字
+	符串标识 1,2 。由于允许节点主动查询其感兴趣的参数的值,它们
+	适用于配置那些不会随时间频繁变更的信息。
+
+	 使得我们能够存储并操作ROS 参数服务器（Parameter Server）上的数据。
+	 参数服务器能够存储整型、浮点、布尔、字符串、字典和列表等数据类型。
+	 rosparam使用YAML标记语言的语法。一般而言，YAML的表述很自然：
+	 1 是整型, 1.0 是浮点型, one是字符串, true是布尔, 
+	 [1, 2, 3]是整型列表, {a: b, c: d}是字典. 
+	 rosparam有很多指令可以用来操作参数，
+
+> a 查看参数列表
+
+	rosparam  list   仅运行 roscore
+	>>>>                         
+	/rosdistro         ros版本
+	/roslaunch/uris/host_ewenwan_lenovo_g480__40299
+	/rosversion
+	/run_id
+
+	在当前版本的 ROS 中,参数服务器是节点管理器的一部分,
+	因此,它总是通过 roscore 或者 roslaunch 自动启动。在所
+	有情况下,参数服务器都能在后台正常工作,因此没有必
+	要去花心思考虑它。然而,需要铭记的是,所有的参数都
+	属于参数服务器而不是任何特定的节点。这意味着参数—
+	—即使是由节点创建的——在节点终止时仍将继续存在。
+
+> b  查询参数
+
+	rosparam get            获取参数  查询参数 
+	rosparam get parameter_name
+	rosparam get /rosdistro
+	>>> indigo
+
+	除此以外,还可以检索给定命名空间中的每一个参数的值,其命
+	令为:rosparam get namespace
+	例如,通过查询全局命名空间,我们可以一次性看到所有参数的值:
+	rosparam get /
+
+> c 设置参数  
+
+	rosparam set           
+	rosparam set  parameter_name  parameter_value
+
+	该命令可以修改已有参数的值或者创建一个新的参数。例如,
+	以下命令可以创建一系列字符串参数,用以存储一组卡通鸭子的
+	颜色偏好:
+	rosparam set /duck_colors/huey red
+	rosparam set /duck_colors/dewey blue
+	rosparam set /duck_colors/louie green
+	rosparam set /duck_colors/webby pink
+
+	另外,我们可以同时设置同一命名空间中的几个参数:
+	rosparam set  namespace  values
+
+	这里要以 YAML 字典的形式表示参数和对应值的映射关系。
+	下面的例子和前面四行命令具有同样的作用:  （冒号后有空格）
+	rosparam set /duck_colors "huey: red
+	dewey: blue
+	louie: green
+	webby: pink"
+
+	查看是否设置成功
+	rosparam get /duck_colors/
+	>>>>
+	{dewey: blue, huey: red, louie: green, webby: pink}
+
+
+	需要注意的是,这种语法需要在命令中使用换行符。
+	当然,这并不会造成什么问题,因为第一个引号告诉 bash 命令尚
+	未完成。当在引号内按下回车时,终端将插入一个换行符而不是执行命令。
+	冒号后的空格是非常重要的,以确保 rosparam 将其作为一个/duck_colors 
+	命名空间内的参数集,而不是全局命名空间中的单个字符串参数 duck_colors。
+
+
+	在launch文件中设置:
+	这是所有node节点的全局 相对名称
+
+	<group ns="duck_colors">
+	<param name="huey" value="red" />
+	<param name="dewey" value="blue" />
+	<param name="louie" value="green" />
+	<param name="webby" value="pink" />
+	</group>
+
+	也可在各自的node节点内设置参数
+	<node ... >
+	<param name="param-name" value="param-value" />
+	. . .
+	</node>
+
+	在该结构下,参数名将被当做该节点的私有名称。
+	这是 ROS 命名规则的一个例外。作为节点元素的子集时,
+	param 元素中给出的参数名总是被当做私有名称解析,无论它们是否以~或者/开始。
+
+	从文件中读取参数:
+	最后,启动文件也支持 与rosparam load等价的命令,可以一次性从文件中加载多个参数:
+	<rosparam command="load" file="path-to-param-file" />
+	这里列出的参数文件通常是通过 rosparam dump 命令创建的。
+	<rosparam
+	command="load"
+	file="$(find package-name)/param-file"
+	/>
+	与 rosparam load 一样,这个功能有助于测试,因为它允许用户重现在过去的某个时间有效的参数。
+
+     
+> d 存储 参数
+
+	为了以 YAML 文件的形式 存储 命名空间 中的所有参数,可以使用
+	rosparam dump 命令
+	rosparam dump filename namespace
+
+> e  加载参数文件
+
+	rosparam load           从文件读取参数
+	它从一个文件中读取参数,并将它们添加到参数服务器:
+	rosparam load filename namespace
+	
+	对于这些命令,命名空间参数是可选的,默认值为全局命名空间(/)。
+	存储和加载的组合可以用来测试,因为它提供了一种
+
+	快捷方式获取一定时间内的参数“快照”,并且可以进行场景复现。
+
+
+> f   例子  turtlesim 中的参数
+
+	作为一个参数的具体例子,让我们来看看在 turtlesim 中如何使用它们的。
+	如果你启动 roscore 和 turtlesim_node,
+	然后查询rosparam 列表,会看到像下面这样的输出:
+	
+	rosparam  list
+	>>>>
+	/background_b
+	/background_g
+	/background_r
+	/rosdistro
+	/roslaunch/uris/host_ewenwan_lenovo_g480__37268
+	/rosversion
+	/run_id
+
+	会多出 背景颜色的 三个分量，它们指定在 turtlesim 窗口中使用背景色,
+	分别为红色、绿色和蓝色通道,一个好的策略,也是演示真正的 ROS 节点
+	如何工作的更好案例,是 turtlesim 首先测试这些参数是否存在,当且仅当
+	这些参数不存在时,才指定默认的蓝色。
+
+ 
+
+> g  获取背景颜色值  
+
+	可以使用 rosparam get 命令获取背景参数的值:
+	rosparam get /background_r
+	rosparam get /background_g
+	rosparam get /background_b
+	这些命令的返回值分别是 69、86 和 255。由于这些值是比较小的整数,让人容易联想到,
+	而且确实是,每个通道是一个 8 位整数,范围从 0 到 255。
+	因此,turtlesim 默认其背景颜色为(69,86,255),这正是我们平时所称的深蓝色。
+
+> h  设置背景颜色值
+
+	//设置为红色
+	rosparam set background_r 250
+	rosparam set background_g 0
+	rosparam set background_b 0
+	
+        rosparam deleat  参数名  删除参数
+
+	然而,即使我们设置完参数后,背景颜色仍然是原来的颜色。
+	这是为什么呢?这是因为只有当 turtlesim_node 的/clear 服务被调
+	用时, 它才会从参数服务器读取这些参数的值。调用这个服务可
+	以使用以下命令:
+	rosservice call /clear
+
+	对一个节点来说,可以请求参数服务器在参数更新后将新参数值发给它,
+	这个功能可以通过 ros::param::getCached
+	命令替换 ros::param::get 来实现。
+	然而,这种方法只是为了提高效率,并没有消除节点检查参数值的需要。
+
+> i  使用 C++获取参数
+
+	使用ROS参数的C++接口是相当简单的 :
+	void ros::param::set(parameter_name, input_value);
+	bool ros::param::get(parameter_name, output_value);
+
+	在这两种情况下,参数名是一个字符串,它可以是全局的、相对的或者是私有的。set 函数中的输入值 input_value
+	可以是std::string、bool、int 或 double 类型;
+	get 函数的输出值应该是上述某个类型的变量(通过引用传递)。
+
+	如果参数值读取成功,则 get 函数返回 true;如果出现了问题,通常表示所请求的参数还没
+	有被指定一个值,则该函数返回 false。为了查看函数的行为,让 我们来看看下面两个实例。
+
+  ros::param::set 功能 cpp 文件
+  
+```c
+  // This program waits for a turtlesim to start up , and
+  // changes its background color .
+  #include <ros/ros.h>
+  #include <std_srvs/Empty.h>//服务
+ 
+  int main( int argc , char** argv )
+  {
+  ros::init ( argc , argv , "set_bg_color") ;
+  ros::NodeHandle nh ;
+
+  // Wait until the clear service is available , which
+  // indicates that turtlesim has started up , and has
+  // set the background color parameters .
+   ros::service::waitForService ("clear") ;//等待 /clear服务可用 即turtlesim 节点已经启动
+ 
+  // Set the background color for turtlesim ,
+  // overriding the default blue color .
+   ros::param::set ("background_r" , 255) ;// set 设置参数
+   ros::param::set ("background_g" , 255) ;
+   ros::param::set ("background_b" , 0) ;
+ 
+ // Get turtlesim to pick up the new parameter values.
+ //rosservice call /clear
+   ros::ServiceClient clearClient = nh.serviceClient <std_srvs::Empty>("/clear") ;
+   std_srvs::Empty srv ;
+   clearClient.call(srv); //更新
+ }
+```
+
+	说明了 ros::param::set 的功能,它为 turtlesim 背景颜
+	色三个参数赋值。本程序的代码在启动 turtlesim 节点前等待
+	/clear 服务调用结束,从而确保 turtlesim 不会覆盖这里设置
+	的值。并且通过调用/clear 服务强制 turtlesim 读取我们设置
+	的参数值。
+
+```c
+ //最大线速度从参数读取 产生随机数0～1
+ //
+ // This program publishes random velocity commands, using
+ // a maximum linear velocity read from a parameter.
+ #include <ros/ros.h>
+ #include <geometry_msgs/Twist.h>//速度和姿态
+ #include <stdlib.h>
+
+ int main( int argc , char** argv ) 
+ {
+ ros::init ( argc , argv , "publish_velocity") ;
+ ros::NodeHandle nh ;
+//创建发布者 发布在话题  turtle1/cmd_vel 上队列大小1000
+ ros::Publisher pub = nh.advertise<geometry_msgs::Twist>( "turtle1/cmd_vel", 1000) ;
+ //生成产生随机数的种子点
+ srand ( time (0) ) ; //初始化随机数 种子
+
+// Get the maximum velocity parameter .
+  const std::string PARAM_NAME = "~max_vel;
+  double maxVel;
+  bool ok = ros::param::get (PARAM_NAME, maxVel) ;// get 读取参数
+  if (!ok) {
+  ROS_FATAL_STREAM("Could not get parameter:"
+  << PARAM_NAME) ;
+  exit (1) ;
+ }
+
+  ros::Rate rate (2) ;
+  while ( ros::ok () ) 
+  {
+ // Create and send a random velocity command.
+   geometry_msgs::Twist msg ;// 速度消息类型
+   msg.linear.x = maxVel*double ( rand () )/double (RAND_MAX) ;  //线速度  为 0 到 1 之间的某个值 * maxVel
+   msg.angular.z = 2*double ( rand () )/double (RAND_MAX) -1;    //角速度  弧度制 为-1 到 1 之间的某个值
+   //发布消息
+   pub.publish(msg) ;
+  // Wait untilit's time for another iteration .
+  rate.sleep () ;
+   }
+ }
+```
+
+	是命令 ros::param::get 的例程。
+	作为原 pubvel 例程(表3.4)的拓展,这里读取私有浮点参数 max_vel 的值,
+	并使用这个参数值来调整随机生成线速度的大小
+
+	rosparam set /publish_velocity/max_vel 0.1
+
+	如果这个参数不存在,那么,该程序将会报错并且终止。
+
+	通过在命令行中使用类似重映射的语法为节点的私有参数赋值在技术上是可行的(但是有些混乱),
+	可以通过给参数名添加下划线前缀实现,如下所示:
+
+	_param-name:=param-value
+	这种命令行参数将被转换为 ros::param::set 的调用,通过
+	ros::init 将“_”替换为“~”构成私有参数的形式。
+	例如,我们可以使用下面的命令成功启动 pubvel_with_max 节点:
+
+	rosrun agitr pubvel_with_max _max_vel:=1
+	rosrun agitros pubVelWMVel _max_vel:=6
+
+	rosparam delete         删除参数
+
+	rosparam get background_g 
+	rosparam get /              //得到全部参数数据
+
+	rosparam dump params.yaml   //将所有的参数写入params.yaml文件
+
+	rosparam load params.yaml copy   //将yaml文件重载入新的命名空间，比如说copy空间
+	rosparam get copy/background_b   
