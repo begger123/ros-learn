@@ -1,0 +1,248 @@
+## 1、创建工作区和功能包
+ 
+	a. 创建文件夹  mkdir -p ~/catkin_ws/src    /home下创建/catkin_ws/src
+	   -p  parents  如果没有父目录/catkin_ws 则自动创建
+	b. 初始化工作空间
+	   cd ~/catkin_ws/src 
+	   catkin_init_workspace
+	c. 编译空的工作目录 生成 依赖库
+	    cd ~/catkin_ws   catkin_make
+
+	d. 创建包   
+	    cd ~/catkin_ws/src
+	    catkin_create_pkg vision_system std_msgs sensor_msgs rospy roscpp
+				  包名字          依赖包
+
+	e. 仅编译单个包：
+	    cd ~/catkin_ws
+	    catkin_make --pkg package_name
+
+	f. 编译成功后  需要 source ~/catkin_ws/devel/setup.bash
+	    导入  新编译的环境
+	    否则 ros 认不出 新编译的包和节点
+	    或则直接把~/catkin_ws/devel/setup.bash 加入到系统启动脚本里~/.bashrc
+	    echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc
+
+
+## 2、src目录
+
+	a. 目录列表
+	  workspace_folder/        -- WORKSPACE
+	 1 src/                   -- SOURCE SPACE
+	   1.1 CMakeLists.txt       -- 'Toplevel' CMake file, provided by catkin
+
+	   1.2 package_1/  包1  例如 beginner_tutorials
+	       CMakeLists.txt     -- CMakeLists.txt file for package_1  编译规则
+	       package.xml        -- Package manifest for package_1     提供有关程序包的元信息
+	       src                -- 存放 源文件 cpp   py 。。。。
+
+
+	       ...
+
+	   1.n package_n/  包n
+	       CMakeLists.txt     -- CMakeLists.txt file for package_n
+	       package.xml        -- Package manifest for package_n        清单文件
+	       src                -- 存放 源文件 cpp   py 。。。。
+
+	 2 devel/
+
+	     依赖库
+	 3 build/
+	     编译文件  
+
+
+
+	b. 清单文件编写规则  package.xml
+
+```xml
+<package>
+  <!-- package name 软件包名字 -->
+  <name>agitros</name>
+  <!-- package version number  软件包版本-->
+  <version>0.0.1</version>                                               
+  <!-- package description 软件包描述信息 -->
+  <description>
+      The Examples from A Gentle Information to ROS package
+  </description>
+  <!--owner‘s email  软件包所有者邮件-->
+  <maintainer email="1631684@tongji.edu.cn">ewenwan</maintainer>
+  <!-- license type  软件包协议-->
+  <license>TODO</license>
+  <!-- <url type="website">http://wiki.ros.org/agitros</url> -->
+  <!-- <author email="jane.doe@example.com">Jane Doe</author> -->
+  <!-- build tools  depends -->
+  <buildtool_depend>catkin</buildtool_depend> 
+  
+  <!-- build depends 软件包编译依赖 -->
+  <build_depend>roscpp </build_depend>
+  <build_depend>geometry_msgs</build_depend>      <!-- geometry  messags build depends -->
+  <build_depend>turtlesim </build_depend>
+  
+  <!-- run depends 软件包运行依赖 -->
+  <run_depend>roscpp</run_depend> 
+  <run_depend>geometry_msgs</run_depend>          <!-- run depends -->
+  <run_depend>turtlesim </run_depend>
+  
+  <!-- The export tag contains other, unspecified, tags -->
+  <export>
+    <!-- Other tools can request additional information be placed here -->
+  </export>
+  
+</package>
+```
+
+c. 编译规则 CMakeLists.txt   编写规则
+
+```c
+   cmake_minimum_required(VERSION 2.8.3)              #cmke编译器最低版本
+   project(agitros)                                   #包名字 工程名
+   find_package(catkin REQUIRED COMPONENTS roscpp)    #编译库依赖     
+   catkin_package()                                   #声明包类型  catkin package
+   add_executable ( helloROS src/HelloWorld.cpp )     
+   #指定节点名字（用于运行时的名字 就是编译生成的可执行文件名字） 以及对应的源文件位置和名称
+
+   #(rosrun 包名 节点名（代称） 主程序初始化ros系统时的节点名为实际节点名 ros::init() )
+   target_link_libraries(helloROS ${catkin_LIBRARIES})#指定节点的编译链接库
+```
+
+d. 可执行文件   源文件  helloROS.cpp
+
+```c
+//ROS Hello,world
+#include<ros/ros.h>    //包含头文件
+
+int main(int argc, char** argv){
+    ros::init(argc, argv, "hello_ros");    //初始化 ROS 系统  最后一个参数为节点默认名的字符  一般为CMakeLists.txt指定节点名称
+    ros::NodeHandle nh;                    //在节点管理器中注册该cpp文件的节点
+    ROS_INFO_STREAM("Hello, ROS!");        //ROS_INFO_STREAM 宏将生成一条消息,且这一消息被发送到不同的位置,包括控制台窗口
+}
+```
+
+ 
+## 3、发布者 程序节点编写实例
+
+	2.1 包含消息类型声明
+	每一个 ROS 话题都与一个消息类型相关联。
+	每一个消息类型都有一个相对应 C++头文件。
+	你需要在你的程序中为每一个用到消息类型包含这个头文件,代码如下所示:
+
+	#include <package_name/type_name.h>
+
+	//这里需要注意的是,功能包名应该是定义消息类型的包的名称，而不一定是你自己的包的名称。
+	在 pubvel 程序中,我们想发布一条类型为 geometry_msgs/Twist 的消息(名为 geometry_msgs 的包
+	所拥有的类型为 Twist 的消息),我们应该这样:
+	#include <geometry_msgs/Twist.h>
+	这个头文件的目的是定义一个 C++类,此类和给定的消息类型含
+	有相同的数据类型成员。这个类定义在以包名命名的域名空间中。
+	这样命名的实际影响是当引用 C++代码中的消息类时,你将会使
+	用双分号(::)来区分开包名和类型名,双分号也称为   范围解析运算符 。
+	在我们的 pubvel 例程中,头文件定义了一个名为
+	geometry_msgs::Twist 的类。
+	
+```c
+<ros/ros.h>               //ROS 库文件
+#include <geometry_msgs/Twist.h>   //发布给小乌龟（turtlesim仿真器）的消息类型头文件库
+#include <stdlib.h>                //标准库 产生rand()随机数
+
+int main( int argc , char** argv ) {
+
+ros::init( argc , argv , "publish_velocity" );  //初始化ROS系统  定义默认节点名字
+ros::NodeHandle nh ;                            //在节点管理器中注册节点
+//在节点上建立一个发布者 pub         发布的消息类型   发布的消息到话题（无前\ 相对名称）   消息序列的大小数据缓存区大小
+//ros::Publisher pub = node_handle.advertise<message_type>(topic_name, queue_size);
+ros::Publisher pub = nh.advertise<geometry_msgs::Twist>( "turtle1/cmd_vel" , 1000 ) ;  //话题不能搞错了 多加空格也不行
+
+//如果你想从同一个节点发布关于多个话题的消息,你需要为个话题创建一个独立的 ros::Publisher 对象。
+//生成产生随机数的种子点
+srand(time(0)) ;       //Seed the random number generator
+ros::Rate rate (2);    //发布频率   控制 消息发布 频率   这个对象控制循环运行速度
+while ( ros::ok() ) {  //ros::ok() 节点是否停止工作的检查  rosnode kill/终止信号(Ctrl-C)
+     //定义消息变量 并以随机数赋值
+     //若消息类型为数组类型(在rosmsg中用方括号示)在C++代码中是通过STL向量实现的。
+     geometry_msgs::Twist msg;  
+     msg.linear.x =      double( rand() ) / double(RAND_MAX);        //线速度  为 0 到 1 之间的某个值
+     msg.angular.z = 2 * double( rand() ) / double(RAND_MAX) - 1;    //角速度  弧度制 为-1 到 1 之间的某个值
+     //发布消息
+     pub.publish( msg ) ;
+     //在控制台显示发布的内容
+     //演示了在输出中除了插入字符串还可以插入其他数据的能力
+     ROS_INFO_STREAM( "Sending random velocity command : "            //ROS  information stream流
+     << " linear speed = " << msg.linear.x << " angular speed = " << msg.angular.z);
+     //休眠等待
+     rate.sleep() ;
+    }
+```
+
+## 4、订阅者
+	4.1编写回调函数 —— 类似中断函数===
+	发布和订阅消息的一个重要的区别是订阅者节点
+	无法知道消息什么时候到达。为了应对这一事实,我们必须把响
+	应收到消息事件的代码放到回调函数里,ROS 每接收到一个新的
+	消息将调用一次这个函数。
+	订阅者的回调函数类似于:
+        订阅话题的包名和类型
+	void function_name(const package_name::type_name &msg)
+	{. . .}
+	其中参数 package_name 和 type_name 和发布消息时的相同,它
+	们指明了我们想订阅的话题的消息类。
+
+	回调函数的主体有权限访接收到消息的所有域,并以它认为合适的方式存储、使用或丢
+	弃接收到的数据。与往常一样,我们必须包含定义该类的头文件
+
+	本例程中,回调函数接收类型为 turtlesim::Pose 的消息,所以我们需要的头文件是 turtlesim/Pose.h。
+	注意订阅者的回调函数的返回值类型为 void。其实这样安排
+	是合理的,因为调用此函数是 ROS 的工作,返回值也要交给 ROS,
+	所以我们的程序无法获得返回值,当然非 void 的返回值类型也就
+	没有意义了。
+
+	4.2 创建订阅者对象
+
+	为了订阅一个话题,我们需要创建一个ros::Subscriber对象                         函数指针
+	ros::Subscriber sub = node_handle.subscribe(topic_name,queue_size, pointer_to_callback_function);
+	
+	这个构造函数有三个形参,其中大部分与 ros::Publisher 声明中的类似:
+	node_handle 与我们之前多次见到的节点句柄对象是相同的。
+	topic_name 是我们想要订阅的话题的名称,以字符串的形式示。
+	
+	本例程中是"turtle1/pose"。再次强调,我们忽略了前斜线使其成为相对名称。
+	
+	queue_size 是本订阅者接收消息的队列大小,是一个整数。
+	通常,你可以使用一个较大的整数,例如 1000,而不用太多关心队列处理过程。
+	最后一个参数是指向回调函数的指针,当有消息到达时要通过这个指针找到回调函数。
+	在 C++中,你可以通过对函数名
+	使用符号运算符(&,“取址”)来获得函数的指针。
+	
+	在我们的实例中,其方法如下:
+	&poseMessageReceived
+	不要在函数名后面犯添加括号()甚至(msg)这样常见的错误。这些括号和参数只有在你想调用函数的时候才需要,
+	而不是你想获得函数指针时。ROS 在它调用你的回调函数时会提供合适的参数
+
+	4.3给ROS控制权
+	实际上有两个略微不同的方式
+	ros::spinOnce();这个代码要求 ROS 去执行所有挂起的回调函数,然后将控制权限回给我们。 
+	仅一次ros::spin();这个方法要求 ROS 等待并且执行回调函数,直到这个节点关机。
+	
+	换句话说,ros::spin()大体等于这样一个循环:
+	while(ros::ok( ))
+	{ ros::spinOnce(); }
+	
+	使用 ros::spinOnce()还是使用 ros::spin()的建议如下:你的程
+	序除了响应回调函数,还有其他重复性工作要做吗?如果答案是 “ 否”,那么使用 ros::spin();
+	否则,合理的选择是写一个循环,做他需要做的事情,并且周期性地调用 ros::spinOnce()来处理回调。
+	SubPose.cpp 用 ros::spin(),因为程序唯一的工作就是接收和打印接收到的位姿消息。
+
+	例如可以这样：
+	
+	ros::Rate rate (1); //每秒订阅 1次 消息
+	while ( ros::ok() ) {
+	ros::spinOnce();  //给ROS控制权  可以调用一次回调函数
+	rate.sleep();
+	}
+
+
+	订阅者程序中常见的一个错误是不小心忽略了调用ros::spinOnce 和 ros::spin。在这种情况下,ROS 永远没有机
+	会去执行你的回调函数。忽略 ros::spin 会导致你的程序在
+	开始运行后不久就退出。忽略 ros::spinOnce 使程序表现的好像没有接收到任何消息。
+
+      
+  
