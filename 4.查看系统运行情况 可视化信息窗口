@@ -1,0 +1,24 @@
+
+> a. 节点关系拓扑
+
+        rosrun rqt_grap rqt_grap
+	rqt_graph 能够创建一个显示当前系统运行情况的动态图形  Graphical user interface
+
+	r 代表 ROS,qt 指的是用来实现这个可视化程序的 Qt 图形界面(GUI)工具包。
+	在该图中, 椭圆形表示节点, 有向边表示其两端节点间的发布-订阅关系。
+	计算图告诉我们, /teleop_turtle 节点向话题/turtle1/cmd_vel 发布消息,
+	而/turtlesim 节点订阅了这些消息(“cmd_vel”
+	是“command velocity”  命令的速度的缩写。)。
+
+> b. 话题数据可视化查看
+
+        rosrun rqt_plot rqt_plot
+	rqt_plot  可以实时显示一个发布到某个话题上的数据变化图形
+
+> c. 系统问题检查
+
+	roswtf    what  the fuck  搞什么呀  fault 错误
+	这条命令会进行全面而深入的检测,包括检测你的环境变量、
+	安装的文件以及运行的节点。例如,roswtf 将会检测在安装过程
+	中 rosdep 初始化是否完成,任何节点是否出现了意外的挂起或者
+	终止,以及活跃的节点是否正确地和其他节点相连接等。
