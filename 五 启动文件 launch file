@@ -1,0 +1,610 @@
+	可一次性启动多个 不同的节点
+
+	利用启动文件一次性配置和运行多个节点。 如果到目前为止你已经走通了本书中所有的例程,那么现在
+	你也许会有些沮丧,因为除了搞定 roscore 外,你还需要在这么 多不同的终端启动这么多不同的节点。幸运的是,ROS 提供了一
+	个同时启动节点管理器(master)和多个节点的途径,即使用
+	启动文件(launch file)。
+
+	事实上,在 ROS 功能包中,启动文件的使 用是非常普遍的。
+	任何包含两个或两个以上节点的系统都可以利用启动文件来指定和配置需要使用的节点。
+
+
+	使用启动文件
+	首先,我们来看一下roslanch是如何同时启动多个节点的。其 基本思想是在一个
+	XML格式的文件内将需要同时启动的一组节点 罗列出来 1 。
+
+	示例同时启动一个  turtlesim仿真器节点和一个遥控节点,这两个节点是我们在第二
+	章遇到过的,还有一个是我们在第三章写的订阅节点。这个启动 文件保存在agtr包的根目录下,文件名为example.launch。在详细
+	介绍启动文件的结构之前,我们先看一下这些文件是如何使用的。
+
+	launch
+		在ROS应用中，每个节点通常有许多参数需要设置，为了方便高效操作多个节点，
+		可以编写launch文件，然后用roslaunch命令运行
+
+		roslaunch: roslaunch [options] [package] <filename> [arg_name:=value...]
+				    roslaunch [options] <filename> [<filename>...] [arg_name:=value...]
+
+	执行启动文件 想要运行一个启动文件,可以像下面这样使用
+
+	roslaunch命令 2 :
+
+		roslaunch package-name launch-file-name
+
+	请求详细信息(Requesting verbosity) 像很多命令行工具一
+	样,roslaunch 有一个可以请求输出详细信息的选项:
+		roslaunch –v package-name launch-file-name
+
+	因此,可以使用如下指令来运行该示例启动文件:
+		roslaunch agitrs example.launch
+
+	launch文件的一般格式，参数：
+		<launch>
+			<node .../>         //节点相关
+			<rosparam ..../>    //ros参数 yaml文件
+			<param .../>        //参数服务器参数
+			<include .../>      //包含其他launch文件
+			<env .../>          //环境变量
+			<remap .../>        //重映射
+			<arg.../>           //局部变量
+		</launch>
+
+
+   例子  
+
+	   <launch>
+	   <node
+	    pkg="turtlesim "
+	    type="turtlesim_node"
+	    name="turtlesim "
+	    respawn="true "
+	   />
+	   <node
+	    pkg="turtlesim "
+	    type="turtle_teleop_key"
+	    name="teleop_key"
+	    required="true"
+	    launch-prefix="xterm -e"
+	   />
+	   <node
+	   pkg="agitr "
+	   type="subpose"
+	   name="pose_subscriber "
+	   output="screen "
+	   />
+	   </launch>
+	
+	############################### 
+	<node>要启动的node参数
+	pkg=''mypackage''     节点所属包名字
+	type=''nodetype''     c++ 文件编译生成的 可执行文件名字  .o  在cmake.list 内
+			  add_executable(reverseCmdVel src/ReverseCmdVel.cpp)
+			  target_link_libraries(reverseCmdVel  ${catkin_LIBRARIES})
+	name="nodename"      节点名字 会覆盖 cpp文件 内 ros::init 初始化的节点名 
+	arg="arg1 ...."(可选)
+	respawn="ture"(可选)如果节点停止，自动重启节点
+	required="true"  （可选）如果节点停止 会停止launch文件启动的所有节点 与respawn不可同时设置
+	ns='foo"（可选）在foo命名空间启动节点   设置节点的命名空间 所属名字空间域
+	output="log|screen"(可选) 日志消息输出 到窗口屏幕
+	launch-prefix="xterm -e"（可选 重新打开一个窗口）
+	</node>
+	###########################
+	<rosparam>操作yaml文件参数
+	command="load|dump|delete"(默认load)
+	file="$(find pkg-name)/path/foo.yaml"(load或dump命令)yaml文件的名字
+	param="param-name"参数名
+
+	##################################
+
+	<param> 定义一个设置在参数服务器的参数，它可以添加到<node>中
+	name="namespace/name"
+	type=''str|int|double|boot''(可选)指定参数的类型
+	value="value"（可选）如果省略这个参数，则应指定一个文件(binfile/textfile)或命令
+	 textfile="$(find pkg-name)/path/file"(可选)
+	binfile="$(find pkg-name)/path/file"()
+	 command="(find pkg-name)/exe '$(find pkg-name)/arg.txt'"(可选)
+	    exe是可执行文件（cpp、py），arg.txt是参数文件
+
+	####################################
+	<include>在当前launch文件中调用另一个launch文件
+	file="$(find pkg-name)/path/launch-file.launch"
+	包含元素同样支持命名空间属性,可以将内容压入一个指定的命名空间中去:
+	<include file=”...” ns=”namespace”/>
+	应该说该设置是十分普遍的,尤其是当被包含进来的
+    
+	###################################
+
+	<env> 设置节点的环境变量
+	name="environment-variable-name"
+	value="environment-variable-value"
+	######################################
+
+	<remap> 将一个参数名映射为另一个名字  即改变订阅的话题名 或发布的话题名等
+	from="original-name"
+	to="new-name"
+	###########################
+
+	<arg> 定义一个局部参数，该参数只能在一个launch文件中使用
+	<arg name="foo"/>声明一个参数foo，后面需要给它赋值
+	<arg name="foo" default="1"/>声明一个参数foo，如不赋值取默认值
+	<arg name="foo" value="bar"/>声明一常量foo，它的值不能修改
+
+   
+	启动文件的基本元素
+	最简单的启动文件由一个包含若干节点元素(node elements) 的根元素(root element)组成。
+	启动文件是 XML 文件,每个 XML 文件都必须要包插入根元素
+	含一个根元素。对于 ROS 启动文件,
+	根元素由一对 launch 标签定义:
+	
+		<launch>
+		...
+		</launch>
+		
+	每个启动文件的其他元素都应该包含在这两个标签之内。
+
+	启动节点
+	任何启动文件的核心都是一系列的节点元素,每个节点元素指向一个需要启动的节点。
+	节点元素的形式为:
+	
+	<node
+	pkg=”package-name”
+	type=”executable-name”
+	name=”node-name”
+	/>
+
+	在节点标签末尾的斜杠“/”是很容易忘记的,但是它很重要。
+	它表明不必再等待结束标签(“</node>”),并且该节
+	点元素是完整的。XML 语法分析器对于这样的细节要求得 非常严格。
+	如果你忽略了这个斜线,将会出现这样的错误信息:
+	Invalid roslaunch XML syntax: mismatched tag
+	你也可以这样显式地给出结束标签: <node pkg=”...” type=”...” name=”...”></node>
+	事实上,如果该节点有子节点,例如 remap 或者 param 元素,
+	那么该显式结束标签是必不缺少的。
+
+	
+     1、pkg  和 type  节点元素 包名和可执行文件别名 属性   
+        每个节点元素有如下三个必需的属性。pkg 和 type 属性定义了 ROS 应该运行哪个程序来启动这个节
+        点。这些和 rosrun 的两个命令行参数的作用是一致的,即给出功能包名和可执行文件的名称。
+     2、 name 节点名称属性   
+         name 属性给节点指派了名称,它将覆盖任何通过调用 ros::int 来赋予节点的名称.        
+         该属性可以覆盖代码中提供给ros::int的命名信息,包括节点可能发出的匿名请求。如果要在启动文件
+         内使用一个匿名名称,可以使用一个anon关键字替换名称属性,例如:
+          name="$(anon base_name)"
+          请注意,对同一个基本名称的重复利用将会产生相同的匿名名称。这说明(1)我们可以在启动文件的其他位置使用该
+          名称,(2)对于每一个想要匿名的节点,都要确保使用不同的基本名称。
+     
+     3、output   日志输出属性     
+	查看节点日志文件使用roslaunch启动一组节点与使用rosrun
+	单独启动每个节点的一个重要不同点是,在默认状态下,从启动文件启动节点的标准输出被重定向到一个日志文件中,
+	而不是在控制台显示 * 。该日志文件的名称是:
+	~/.ros/log/run_id/node_name-number-stout.log
+	其中,run_id 是节点管理器启动时生成的一个唯一标示符。
+	rosparam get /run_id
+               
+	在控制台中输出信息 对于某个单独的节点,只需在节点元素中配置 output 属性就可以达到该目的:
+	output="screen"
+
+	配置了该属性的节点会将标准输出显示在屏幕上而不是记录 到之前讨论的日志文档。
+	示例程序对 subpose 节点配置了该属性,
+	这就是为什么该节点的 INFO 信息会出现在控制台中,
+	同时也说明了为什么该节点没有出现在之前提到的日志文件列表中。
+	除了影响单个节点输出信息的 output 属性之外,我们还可以 
+	使用--screen 命令行选项来令 roslaunch 在控制台中显示所有节点的输出:
+	roslaunch –screen package-name launch-file-name
+
+	如果一个从 roslaunch 中启动的程序没有产生预期的输出, 
+	你 应 该 检 查 一 下 是 否 为 该 节 点 设 置 了 output 属 性
+	(output="screen")。
+
+       
+       4、 respawn  请求复位属性   重生
+
+	请求复位 在启动了启动文件中所有的请求节点之后,roslaunch 会监视每一个节点,
+	记录哪一个节点是活跃的。对于每个节点,
+	我们可以设置 respawn 属性为真,这样当节点停止的时候, roslaunch 会重新启动该节点。
+	respawn=”true”
+	这个功能是有意义的,比如在某个节点因为软件崩溃或硬件故障
+	以及其他原因导致过早退出系统的时候会起到作用。
+	在我们的示例中,respawn 属性实际上是不需要的,因为三个程序都很可靠。
+	但是我们在 turtlesim_node 中包含了该属性,
+	用来展示该属性如何工作。当我们关闭 turtlesim 窗口的时候,相应的节点也会停止,
+	ROS 很快就会识别到这样的变化。由于该节
+	点设置了复位属性,一个新的 turtlesim 节点(有其对应的窗口)将会运行来代替之前的对应节点。
+
+
+   
+      5、required  必要节点属性  关闭属性
+	必要节点(requiring node) 复位之外的另一种策略是将一个节点声明为必要节点。
+	required="true"
+
+	当一个必要节点终止的时候,roslaunch 会终止所有其他活跃节点并退出。
+	当出现
+	(1)某个节点非常重要,此节点的故障会导致整个 ROS 会话的瘫痪;
+	(2)节点即便设置了复位属性也不能很好地重启的时候,该需求属性的作用就会体现出来。
+	示例中对 turtle_teleop_key 节点配置了 required 属性。如果你关闭了该远程控制节点所在的窗口,
+	roslaunch 将会终止另外两个节点,然后退出。
+
+	由于 respawn 和 required 二者的作用是相互矛盾的,因此,如果对一个节点同时配置了这两种属性, roslaunch 会报错。
+
+    6、launch-prefix    启动前缀   命令行前缀   独立窗口属性
+
+	为节点维护独立的窗口 使用 roslaunch 的一个缺点是所有的节点共享一个终端,
+	而使用 rosrun 的时候,每个节点都有一个独立的
+	终端。这对于不接收控制台输入,只生成日志消息的节点是可行的(通常也是有帮助的),
+	但是对于依赖控制台输入的节点来说,
+	例如 turtle_teleop_key,更倾向于为节点保留独立的终端。
+
+	幸运的是,roslaunch 提供了一个实现该目的的简洁方法——对节点元素使用启动前缀(launch-prefix)属性:
+	launch-prefix=“command-prefix” 事实上,roslaunch 在启动节点时的内部工作原理是调用相应
+	的命令行工具,即 rosrun。启动前缀的主要思想是在其命令行前面添加给出的命令行前缀。
+	在我们的例子中,遥操作节点使用了这个功能:
+	launch-prefix="xterm -e"
+	在这个属性的作用下,节点元素和在命令行中输入下面的命 令基本上是等价的:
+	xterm -e rosrun turtlesim turtle_teleop_key
+
+	    execute  terminal     
+	正如你所知,xterm 命令将打开一个简单终端窗口。参数-e 告诉 xterm 
+	在新打开的终端中执行该命令行的剩余部分(这里是
+	rosrun turtle_teleop_key ), 运 行 的 结 果 是 基 于 纯 文 本 的 程 序
+	turtle_teleop_key 出现在一个图形窗口中。
+	当然,启动前缀属性并不只局限于xtrem。该属性也可以用
+	来调试(通过gdb或valgrind)或降低一个进程的优先级(通过nice) 。
+
+
+   
+    7、在命名空间内启动节点 命名空间属性  ns="sim1"
+
+	对一个节点设置默认命名空间——这个过程通常叫做压入(pushing down)命名空间——的通常方法是使用
+	一个启动文件,并对其节点元素配置命名空间(ns)属性:
+	ns=”namespace”
+
+      
+	<launch>
+	       <node
+		name="turtlesim_node"
+		pkg="turtlesim"
+		type="turtlesim_node"
+		ns="sim1">
+	       </node>
+
+	       <node
+		pkg="turtlesim"
+		type="turtle_teleop_key"
+		name="teleop_key"
+		required="true"
+		launch-prefix="xterm -e"
+		ns="sim1" >
+	       </node>
+
+	       <node
+		name="turtlesim_node"
+		pkg="turtlesim"
+		type="turtlesim_node"
+		ns="sim2" >
+	       </node>
+
+	       <node
+		pkg="agitros"
+		type="pubVel"
+		name="velocity_publisher"
+		ns="sim2" >
+	       </node>
+	 </launch>
+ 
+ 
+	一个仿真中海龟由随机生成的速度指令控制,另一个仿真中海龟是远程控制的。
+	rqt_graph
+	从图中可以看到,前面我们多次见到的 turtlesim 节点相关的话题名称 ( turtle1/cmd_vel 、 turtle1/color_sensor 以 及
+	turtle1/pose)已经从全局命名空间被移动到了两个独立的命 名 子 空 间 /sim1 和 /sim2 。 
+	这 种 变 动 产 生 的 原 因 是
+	turtlesim_node 节 点 的 代 码 在 创 建 ros::Pbulisher 和ros::Subccriber 
+	对象时使用了像 turtle1/pose 这样的相对名称
+	(而不是/turtle1/pose 这样的全局名称)。
+	同样,启动文件中的节点名称是相对名称。在该例子中,两 个节点有相同的相对名称——turtlesim_node。
+	完全一样的相对名称并不会造成问题,因为他们对应的
+	全局名称即
+	/sim1/turtlesim_node 和/sim2/turtlesim_node 并不相同。
+
+
+	事实上 roslaunch 要求启动文件中的节点名称是基名称,即 不涉及任何命名空间的相对名称。
+	如果节点元素的名称属性中出现了全局名称,roslaunch 将会报错.
+
+	在 2.8 节,我们只改变了节点名称,并把所有节点放在同一 个命名空间。
+	因此,两个 turtlesim 节点向同一个话题订阅和发布
+	信息,没有办法单独同两个仿真中的一个进行交互。而在表 6.3 的例子中,
+	我们将每一个节点都压入自己的命名空间中去,这样
+	使两个模拟器真正地独立起来,从而可以给每个节点发送不同的速度指令。
+
+	在该例中,由 ns 属性定义的命名空间本身是相对名称。
+	也就是说,我们在一个默认命名空间是全局命名空间“/”的启
+	动文件内使用了 sim1 和 sim2 这两个名称。因此,两个节点的默认命名空间就解析到/sim1 和/sim2。
+	从技术层面看,完全可以做到为这个属性设置一个全局名称:然而,这是一个非常糟糕的想法。
+	因为本质上,这和
+	在节点内使用全局名称的做法如出一辙。这样做将会阻止启动文件被压入到其他命名空间中,
+	例如被另一个启动文件包含的时候。
+
+
+   
+     8、 名称重映射(Remapping names)
+
+	除 了 相 对 名 称 和 私 有 名 称 , ROS 节 点 还 支 持 重 映 射(remapping),它可以从更精细的层面控制对所用节点名称的修
+	改 。重映射是基于替换的思想:每个重映射包含一个原始名称和一个新名称。每当节点使用重映射中的原始名称时,ROS客户
+	端库就会将它默默地替换成其对应的新名称。
+
+	当启动一个节点的时候,有两种方法来创建重映射。
+	1)当使用命令行启动节点时,分别给出原始名称和新名称,中间由一个:=分开,如下所示:
+	    original-name := new-name
+	例如,运行一个 turtlesime 的实例,如果想要把海龟的姿态数据发布到话题/tim 而不是/turtle1/pose,就可以使用如下命令:
+	    rosrun turtlesim turtlesim_node turtle1/pose:=tim
+
+	2) 通过启动文件的方式,只需在启动文件内使用重映射(remap)元素即可:
+	 <remap from="original-name"to"new-name"/>
+	 如果该属性在顶层,即作为 launch 元素的子元素出现,重映射将会应用到所有的后续节点。这些重映射元素也可以作为
+	 一个节点元素的子元素,如:
+	    <node node-attributes>
+	      <remap from=”original-name”to ”new-name”/>
+	    </node>
+	在这种情况下,给出的重映射只应用于其所在的节点。例如,1)中的命令行本质上等价于如下结构的启动文件:
+	<node pkg=”turtlesim” type=”turtlesim_node”
+	      name=”turtlesim_node”>
+	      <remap from=”turtle1/pose”to ”tim”/>
+	</node>
+
+	关于重映射的使用,有一点需要牢记:在 ROS 应用任何重映射之前,所有的名称都要先解析为全局名称,包括重映射中的原
+	始名称和新名称。因此,虽然在重映射中出现的名称通常是相对名称,但当名称解析完成后,重映射就可以通过直接的字符串比
+	较来实现,即在所有重映射中查找某个节点使用的原始名称。
+
+
+      8.1利用重映射 来反向海龟(Reversing a turtle)
+      
+	下面我们举一个具体的例子来说明这些重映射是如何起作用的。
+	考虑这样一个方案,我们还是使用 turtle_teleop_key 来控制
+	turltesim 中海龟的运动,但是让每一个方向键的含义都翻转过来。
+	也就是说,我们让左键控制顺时针旋转,右键控
+	制逆时针旋转,上键控制它倒退,下键控制它前进。
+	这么做看起来也许有些不合情理,但是它却能够代表一类问题,
+	即一个节点发布的消息一定要转化为另一个节点所期望的格式。
+
+	一个显而易见的方案是复制 turtle_teleop_key 的源代码,并对其进行修改,
+	以达到我们想要的效果。但是这个方案令人非常
+	不满,因为它要求用户首先理解代码,更糟糕的是,有可能造成 代码重复。
+	另一种方案是编写一个新的程序,利用它来把遥操作 节点发送的速度指令进行反转。
+
+  
+  //订阅键盘发送消息的话题，反转消息发布到一个新的话题 ，利用launch的重映射改变turtlesim_node 订阅的话题
+  
+```C
+  // This program subscribes to turtle1/cmd_vel and
+   // republishes on turtle1/cmd_vel_reversed ,
+   // with the signs inverted .
+   #include <ros/ros.h>
+   #include <geometry_msgs/Twist.h> //消息类型头文
+   ros::Publisher *pubPtr;
+   
+  //订阅turtle1/cmd_vel话题的回调函数
+   void commandVelocityReceived (const geometry_msgs::Twist &msgIn ) {
+   geometry_msgs::Twist msgOut;
+   msgOut.linear.x = -msgIn.linear.x;
+   msgOut.angular.z = -msgIn.angular.z;
+   pubPtr->publish(msgOut);
+   }
+   
+   int main( int argc , char** argv ) {
+   ros::init ( argc , argv , "reverse_velocity");
+   ros::NodeHandle nh;
+   
+     //把反转的消息发布到turtle1/cmd_vel_reversed 新话题上
+   pubPtr = new ros::Publisher ( nh.advertise <geometry_msgs::Twist>("turtle1/cmd_vel_reversed",1000) ) ;
+    //订阅turtle1/cmd_vel话题上的消息（键盘控制发来的）
+   ros::Subscriber sub = nh.subscribe ("turtle1/cmd_vel" , 1000 ,&commandVelocityReceived ) ;
+ 
+   ros::spin () ;
+ 
+   delete pubPtr ;
+  }
+  
+```
+  
+  
+	<launch>
+	       <node
+		pkg="turtlesim"
+		type="turtlesim_node"
+		name="turtlesim_node">
+		<remap
+		 from="turtle1/cmd_vel"
+		 to="turtle1/cmd_vel_reversed"/>
+	       </node>
+
+	       <node
+		pkg="turtlesim"
+		type="turtle_teleop_key"
+		name="teleop_key"
+		required="true"
+		launch-prefix="xterm -e">
+	       </node>
+
+	       <node
+		pkg="agitros"
+		type="reverseCmdVel"
+		name="reverse_velocity2">
+	       </node>
+	 </launch>
+ 
+ 
+ 
+ 
+    9、launch文件的其他参数
+
+	1)包含其他文件  include 元素
+	<include file="path-to-launch-file">
+	此处 file 属性的值应该是我们想包含的文件的完整路径。
+	由于直接输入路径信息很繁琐且容易出错,大多数包含元素都使用
+	查找(find)命令搜索功能包的位置来替代直接输入路径: $(变量名)
+	<include file="$(find package-name)/launch-file-name">
+	eg: <include file ="$( find agitr )/doubleTurtle.launch"
+	包含元素同样支持命名空间属性,可以将内容压入一个指定的命名空间中去:
+	<include file=”...” ns=”namespace”/>
+	应该说该设置是十分普遍的,尤其是当被包含进来的启动文件属于
+	另一个功能包的时候,设置的操作应当独立于其他节点。
+
+	roslaunch 命令 将会在程序包(package)的子目录里搜索launch文件。
+	include 元素必须要指定文件的特定路径，
+	你可以使用 find 来找到这个程序包，但是却不能在这个程序包目录里面自动的找到某个子目录里有launch文件。
+	举例：
+	这样做是正确的：<include file = "find learning_tutrols"/launch/start_demo.launch" / >
+	这样做是错误的：<include file = "find learning_tutrols"/start_demo.launch" />
+
+
+
+	2) 启动参数 launch arguments   局部变量
+	为了使启动文件便于配置,roslaunch还支持启动参数,有时也简称为参数甚至args,
+	其功能有点像可执行程序中的局部变量
+	<arg   name="use_sim3"   default ="0" />
+	这样做的优点是通过设置参数来描述节点在不同ROS会话中运行时可能需要改变的一小部分,从而避免代码重复。
+	为了说明这一点,示例文件中使用了名为use_sim3 的参数,用来确定启动三个还是两个turtlesim节点。
+
+	尽 管 在 计 算 机 领 域 术 语 中 很 多 情 况 下 prarmeter 和argument 都是可以互换的,
+	但是在 ROS 中,二者的含义是
+	非常不同的(译者注:在中文中一般都称为参数,更没有明显的区分,
+	因此后面还是使用它们的英文原文说明问题)。
+	a） parameter 是运行中的 ROS 系统使用的数值,存储在参数服务器(parameter server)中,
+	每个活跃的节点都可
+	以通过 ros::param::get 函数来获取 parameter 的值,用户也可以通过 rosparam 来获得 parameter 的值(参见第 7 章)。
+	b) argument 只在启动文件内才有意义;他们的值是不能被节点直接获取的。
+
+	<launch>
+	   <include file ="$( find agitros )/launch/doubleTurtle.launch"/>
+
+	   <!-- 参数名：use_sim3 默认值为：0 -->
+	   <arg   name="use_sim3"   default ="0" />
+
+	   <group ns="sim3" if="$( arg use_sim3 )" >
+	     <node
+	      name="turtlesim_node"
+	      pkg="turtlesim"
+	      type="turtlesim_node"/>
+	     <node
+	      pkg="turtlesim"
+	      type="turtle_teleop_key"
+	      name="teleop_key"
+	      required="true"
+	      launch-prefix="xterm -e"/>
+	   </group>
+	</launch>
+  
+  
+
+	3) 参数赋值 启动文件中的每一个参数都要进行赋值。
+	赋值有很多种方法,例如可以像下面在 roslaunch 命
+	a) 令行中提供该值:
+	roslaunch package-name launch-file-name arg-name:=arg-value
+	
+	b) 除此之外,你也可以使用以下两种语法,将参数值作为 arg声明的一部分:
+	
+	<arg name="arg-name" default="arg-def-value"/>
+	<arg name="arg-name" value="arg-value"/>
+	
+	两者的唯一区别在于命令行参数可以覆盖默认值 default,但是不能覆盖参数值 value。
+	在示例中,use_sim3 有默认值 0,但是可以用如下命令行对参数值进行修改:
+	roslaunch agitros tripleTurtle.launch use_sim3:=1
+	如果我们想修改启动文件,用 value 替换 default,那么该命令会产生错误,因为由 value 设置的参数值是不能更改的.
+
+	4) 获取参数值
+	一旦参数值被声明并且被赋值,你就可以利用下面的arg 替换(arg substitution)语法来使用该参数值了:
+	$(arg arg-name)
+	每个该替换出现的地方,roslaunch 都将它替换成参数值。在示例中,我们在 group 元素中的 if 属性使用了一次 use_sim3 参数
+
+	5)传递参数到 包含的启动文件
+	单独参数
+	向包括的启动文件中发送参数值 目前已介绍的参数设定技巧的局限在于,
+	它并未提供任何方法将参数传递到通过包含元素导入
+	的次级启动文件中去。这一点很重要,因为像局部变量一样,
+	参数仅定义在对其进行声明的启动文件中,而不能被包含的启动文件“继承”。
+
+	该问题的解决方案就是将 arg 元素作为一个包含元素的子元素,如下所示:
+	<incluce file="path–to-launch-file">
+	<arg name="arg-name" value="arg-value"/>
+	...
+	</include>
+
+	请注意,该 arg 元素的用法和之前我们看到的 arg 声明是不同的。
+	在 include 标签之间的参数是属于被包含文件的,而不是它
+	们出现的启动文件。因为目的是为被包括的启动文件设置响应的参数值,所以该处需要使用 value 属性。
+
+	共同参数
+	一种常见的情况是两个启动文件(包含文件和被包含文件)有一些共同的参数,
+	在这种情况下,我们希望参数在传递的时候
+	不会改变。这样的元素在两个地方使用相同的参数名:
+	<arg name="arg-name" value="$(arg arg-name)">
+	在该例子中,第一个参数名字通常是指被包含文件中的参数,第二个参数名是指当前文件中的参数。
+	这样做之后,给定参数在两个启动文件中有相同的值。
+
+	6 ) 创建组类似打包 (Creating groups)  
+	这里介绍启动文件的最后一个特征,即组(group)元素,
+	它提供了一种在大型启动文件内管理节点的便捷方式，具体来讲组元素可以完成如下两种任务:     
+
+	组可以把若干个节点放入同一个命名空间内。
+	<group ns=”namespace”/>
+	...
+	</group>
+	组内的每个节点都从给定的默认命名空间启动。
+
+	如果一个组元素内的某个节点有它自己的命名空间属性,并且其名称是(原则上也应该是)相对名称,那么该节点
+	将会在一个默认命名空间内启动,这个默认的命名空间是将此节点命名空间嵌入到组元素命名空间的结果。这个规
+	则和前面讲到的名称解析是相符的,并且这个规则也适用于组元素的嵌套。
+
+	<group if=”0 or 1”/>     // <group ns="sim3" if="$( arg use_sim3 )" >
+	...
+	</group>
+	如果 if 属性的值为 1,则组元素标签内的元素被正常包含。 反之,如果 if 属性的值为 0,则标签内元素被忽略。
+	还有一个 unless属性的用法是相似的,只是意思相反。
+	<group unless=”1 or 0”/>
+	...
+	</group>
+
+
+	我们的示例中使用一个单独的组演示了这两种使用目的。该组既使用了命名空间属性将组内的两个节点放入命名空间
+	sim3,又使用了 if 属性实现了基于 use_sim3 参数值使能或禁用第三个仿真器。
+
+	注意,组元素并不是严格必须的。如果不使用组,我们也可以对可能包括到组内的每个元素单独设置 ns、 if 和 unless
+	等属性。然而,使用组可以减少代码重复——命名空间和条件设置仅出现一次——并且使启动文件的结构更加清晰。
+
+	不幸的是,只有前面提到的三个属性可以通过组进行传递。例如,尽管我们很想,但不能为组元素设置
+	output=”screen”,必须直接为每一个我们想要应用它的节点设置该属性。
+       
+	9、param 标签   设置参数服务器上的数据
+	定义了一个参数服务器上的参数，属性有
+	name : 参数名字
+	type :参数的类型，”str|int|double|bool”
+	value:参数的值，除了value还可以使用以下三种
+	textfile= $(find pkg-name)/path/file.txt，
+	该文件的内容将被读取并存储为一个字符串，此文件必须是本地的，可访问的。
+	所以强烈推荐使用$(find pkg-name) 形式来。避免在另一台机器上找不到文件路径运行失败。
+	binfile="$(find pkg-name)/path/file"该文件的内容将被读取并存储为Base64编码的XML-RPC二进制对象
+	command="$(find pkg-name)/exe '$(find pkg-name)/arg.txt'"
+
+	parameter server 参数除了上述launch param标签方法修改外，可以通过以下方式设置
+	1) 命令行 rosparam set 设置  /    获取   rosparam get  
+	2) 代码中
+	roscpp: 设置  ros::param::set /   获取 ros::param::get
+	rospy:  设置  set_param       /   获取 get_param
+
+	10、rosparam 标签
+	rosparam ：可以使用从rosparam YAML文件加载load，删除delete，存储dump ，ROS参数服务器参数
+	rosparam 参数：
+	command="load|dump|delete" (optional, default=load)
+	file="$(find pkg-name)/path/foo.yaml" (load or dump commands)
+	param="param-name"
+	ns="namespace"                        (optional)
+	subst_value=true|false (optional) 是否允许替换yaml文本中的参数
+
+
+	<rosparam command="load"   file="$(find rosparam)/example.yaml" />          //加载文件中的参数
+	<rosparam command="delete" param="my/param" />                              //删除参数
+	<arg name="whitelist" default="[3, 2]"/>
+	<rosparam param="whitelist" subst_value="True">$(arg whitelist) </rosparam> //替换
+	<rosparam param="a_list">[1, 2, 3, 4] </rosparam>
+	<rosparam>
+	a: 1
+	b: 2
+	</rosparam>
