@@ -1,0 +1,32 @@
+	roscore                               master 节点
+
+	rosrun turtlesim turtlesim_node       小乌龟 节点
+
+	rosrun turtlesim turtle_teleop_key    键盘遥控节点 
+	                                      teleop 是 teleoperation(遥控操作)
+
+	turtlesim_node节点和turtle_teleop_key节点之间是通过一个ROS话题来互相通信的。
+	urtle_teleop_key在一个话题上发布按键输入消息，而turtlesim则订阅该话题以接收该消息。
+
+
+	rosnode list       #查看运行的节点
+		/ rosout   #rosout 节点是一个特殊的节点,通过 roscore 自动启动
+			   #其作用有点类似于控制台程序中使用的标准输出(即 std:: cout)。
+			   #/rosout前面的反斜杠“/”表明该节点名称属于全局命名空间。
+		/ teleop_turtle  #节点名并不一定与对应可执行文件名称相同
+		/ turtlesim
+
+	更改节点名称    用__name 指定节点名称
+	rosrun package-name executable-name __name:=node-name
+
+	ROS节点之间进行通信所利用的最重要的机制就是消息传递。
+	在ROS中,消息有组织地存放在话题里。
+
+	消息传递的理念是:
+	当一个节点想要分享信息时,它就会发布(publish)消息到对应的
+	一个或者多个话题;
+
+	当一个节点想要接收信息时,它就会订阅(subscribe)它所需要的一个或者多个话题。
+	ROS节点管理器负责确保发布节点和订阅节点能找到对方;
+
+	而且消息是直接地从发布节传递到订阅节点,中间并不经过节点管理器转交。
