@@ -1,0 +1,292 @@
+
+> 1、demo运行环境
+   
+	sudo apt-get install ros-indigo-ros-tutorials ros-indigo-geometry-tutorials ros-indigo-rviz ros-indigo-rosbash ros-indigo-rqt-tf-tree
+
+> 2、运行demo
+
+	roslaunch turtle_tf turtle_tf_demo.launch
+
+
+内容：
+
+	 <launch>
+	  <!-- Turtlesim Node-->
+	  <node pkg="turtlesim" type="turtlesim_node" name="sim"/>   节点名为sim的小乌龟
+	  <node pkg="turtlesim" type="turtle_teleop_key" name="teleop" output="screen"/>  键盘控制
+	  <!-- Axes -->
+	  <param name="scale_linear" value="2" type="double"/>       全局参数
+	  <param name="scale_angular" value="2" type="double"/>
+	  <node name="turtle1_tf_broadcaster" pkg="turtle_tf" type="turtle_tf_broadcaster.py" respawn="false" output="screen" >
+	    <param name="turtle" type="string" value="turtle1" />     坐标广播1
+	  </node>
+	  <node name="turtle2_tf_broadcaster" pkg="turtle_tf" type="turtle_tf_broadcaster.py" respawn="false" output="screen" >
+	    <param name="turtle" type="string" value="turtle2" />     坐标广播2
+	  </node>
+	  <node name="turtle_pointer" pkg="turtle_tf" type="turtle_tf_listener.py" respawn="false" output="screen" >
+	  </node>                                                    坐标监听
+	</launch>
+
+
+
+
+> 3、可视化
+
+	节点关系图
+	rqt_graph
+	坐标变换图静态
+	rosrun tf view_frames
+	会生成一个pdf文件
+	显示    pdf文件
+	evince frames.pdf
+
+	Therefore an helpful shortcut to add in your .bashrc is:
+	alias tf='cd /var/tmp && rosrun tf view_frames && evince frames.pdf &'
+
+
+	坐标变换图实时显示
+	rosrun rqt_tf_tree rqt_tf_tree   或者 rqt & （貌似不行）
+
+> 4、显示坐标转换信息  tf_echo
+
+	rosrun tf tf_echo [reference_frame] [target_frame]
+
+	rosrun tf tf_echo turtle1 turtle2
+
+
+> 5、显示动态坐标 rviz
+
+	加载官方配置文件
+	rviz -d `rospack find turtle_tf`/rviz/turtle_rviz.rviz
+	或者自己打开
+	rviz  刚打开没有显示 需要添加显示的物体 以及配置参考系
+	界面左下角
+	>>> 点击ADD按钮 添加 要显示的物体  TF坐标系
+	界面左上角
+	>>> 选择Global Options（全局选项） 下的Fixed Frame（参考坐标系）  从map 改为 world（其实也就是坐标原点为参考系）
+	>>> TF下还有 
+	 坐标系名字（show name）、轴(show axes）以及坐标变换连接箭头（show arrows）
+	 注意 TF下的Frame（坐标系）要全部使能 enable
+
+	界面右上角
+	有三维视角（照相机视角）选项
+
+
+> 6、编写 坐标 广播和监听
+
+	创建tf学习包：
+
+	  cd %YOUR_CATKIN_WORKSPACE_HOME%/src
+	  catkin_create_pkg learning_tf tf roscpp rospy turtlesim
+
+	cd catkin_ws/src/
+	catkin_create_pkg learning_tf tf roscpp rospy turtlesim
+			   包名        依赖
+```c
+//turtle_tf_broadcaster.cpp
+#include <ros/ros.h> //ros系统库文件
+#include <tf/transform_broadcaster.h>//坐标广播类型头文件
+#include <turtlesim/Pose.h>          //广播的消息类型 小乌龟的位置
+
+std::string turtle_name;             //需要被广播坐标的坐标系名字变量
+
+void poseCallback(const turtlesim::PoseConstPtr& msg){
+  //定义一个 坐标变换广播
+  static tf::TransformBroadcaster br; //对应 #include <tf/transform_broadcaster.h>
+  //定义一个 坐标变换 变量
+  tf::Transform transform;
+  //初始化为坐标原点
+  transform.setOrigin( tf::Vector3(msg->x, msg->y, 0.0) );
+  //坐标变换中间变量 四元素
+  tf::Quaternion q;
+  q.setRPY(0, 0, msg->theta);//row pitch yaw(绕z旋转)
+  //得到坐标变换内容
+  transform.setRotation(q);
+  //发送坐标变换                             变换内容      时间戳    父坐标系（参考坐标系）   子坐标系
+  br.sendTransform(       //带有时间戳类型的坐标变换内容类型
+                       tf::StampedTransform(transform, ros::Time::now(), "world", turtle_name)
+                   );
+}
+
+int main(int argc, char** argv){
+  //初始化ros  注册节点  名字 my_tf_broadcaster_node
+  ros::init(argc, argv, "my_tf_broadcaster_node");
+  //argument count 至有一个 坐标系 名字
+  if (argc != 2){
+    ROS_ERROR("need turtle name as argument");
+    return -1;
+    };
+  
+  turtle_name = argv[1];
+  //节点句柄
+  ros::NodeHandle nh;
+  //创建一个订阅者 订阅被广播者的 位置话题信息                 列队大小  订阅者的回调函数
+  ros::Subscriber sub = nh.subscribe(turtle_name+"/pose", 10, &poseCallback);
+
+  ros::Rate rate (10); //每秒订阅 10次 消息
+ //当nh节点没有结束   或者 nh.ok()
+ while ( ros::ok() ) {
+    ros::spinOnce();  //给ROS控制权  可以调用一次回调函数
+    rate.sleep();
+ }
+ // ros::spin();  //给ros控制权 即使能中断 可以无限次调用回调函数
+  return 0;
+};
+```
+
+//turtle_tf_listener.cpp
+
+```c
+#include <ros/ros.h>//ros系统库文件
+#include <tf/transform_listener.h>//坐标监听类型头文件
+#include <geometry_msgs/Twist.h>  //发布到小乌龟2 的 几何坐标速度等的话题上
+#include <turtlesim/Spawn.h>      //新生成 一个小乌龟所调用的服务文件库
+
+int main(int argc, char** argv){
+  //初始化ros  注册节点  名字 my_tf_listener_node
+  ros::init(argc, argv, "my_tf_listener_node");
+  //节点句柄
+  ros::NodeHandle nh;
+  //等待 spawn（重生）服务可用 
+  ros::service::waitForService("spawn");
+  //通过调用服务spawn  添加一个小乌龟  默认为 turtle2 命名空间
+  ros::ServiceClient add_turtle = nh.serviceClient<turtlesim::Spawn>("spawn");
+  turtlesim::Spawn srv;
+  add_turtle.call(srv);
+  //创建发布者                                 消息类型               话题名        队列大小
+  ros::Publisher turtle_vel =nh.advertise<geometry_msgs::Twist>("turtle2/cmd_vel", 10);
+  //创建坐标系变换监听
+  tf::TransformListener listener;
+  //监听频率
+  ros::Rate rate(10.0);
+  //当nh节点没有结束   或者 ros::ok()
+  while (nh.ok()){
+    // 创建带有时间戳类型的坐标变换内容 变量 与 Broadcaster 发布的对应
+    tf::StampedTransform transform;
+    try{ //监听两个小乌龟的坐标 得到两坐标差别  /turtle2紧跟/turtle1 列队中最新可用变换 時間
+      //listener.lookupTransform("/turtle2", "/turtle1",ros::Time(0), transform);
+                                                            //会出错 waitForTransform 
+      //listener.lookupTransform("/turtle2", "/turtle1",ros::Time::now(), transform);
+      
+      //监听/turtle2小乌龟 和/turtle1小乌龟旁2米的子坐标系/carrot1 得到两坐标差别  /turtle2紧跟/turtle1
+      //listener.lookupTransform("/turtle2", "/carrot1",ros::Time(0), transform);
+      
+      //等待变换
+      /*
+      ros::Time now = ros::Time::now();                    //最长等待時間 3s
+    listener.waitForTransform("/turtle2", "/turtle1", now, ros::Duration(3.0));
+    listener.lookupTransform("/turtle2", "/turtle1", now, transform);
+                             */
+        // 过去時間     有问题
+        /*
+     ros::Time past = ros::Time::now() - ros::Duration(5.0);
+    listener.waitForTransform("/turtle2", "/turtle1", past, ros::Duration(1.0));
+    listener.lookupTransform("/turtle2", "/turtle1", past, transform);
+    */
+        //
+    ros::Time now = ros::Time::now();
+    ros::Time past = now - ros::Duration(5.0);
+    listener.waitForTransform("/turtle2", now,
+                              "/turtle1", past,
+                              "/world", ros::Duration(1.0));
+    listener.lookupTransform("/turtle2", now,
+                             "/turtle1", past,
+                             "/world", transform);
+                             
+    }
+    catch (tf::TransformException &ex) {
+      ROS_ERROR("%s",ex.what());
+      ros::Duration(1.0).sleep();
+      continue;
+    }
+  //turtle2/cmd_vel 上的消息类型  #include <geometry_msgs/Twist.h> 
+    geometry_msgs::Twist vel_msg;
+  // 角速度
+    vel_msg.angular.z = 4* atan2(transform.getOrigin().y(),
+                                    transform.getOrigin().x());
+  //线速度
+    vel_msg.linear.x = 0.5 * sqrt(pow(transform.getOrigin().x(), 2) +
+                                  pow(transform.getOrigin().y(), 2));
+  //发布消息
+    turtle_vel.publish(vel_msg);
+  //空闲时间休息 可以做其它事情
+    rate.sleep();
+  }
+  return 0;
+};
+```
+
+//add_frame_tf_broadcaster.cpp
+```c
+#include <ros/ros.h> //ros系统库文件
+ #include <tf/transform_broadcaster.h>//坐标广播类型头文件
+
+ int main(int argc, char** argv){
+    
+//初始化ros  注册节点  名字 my_tf_broadcaster_node
+ ros::init(argc, argv, "add_frame_tf_broadcaster");
+ // 节点句柄
+ ros::NodeHandle nh;
+ //定义一个 坐标变换广播
+ tf::TransformBroadcaster br;
+ //定义一个 坐标变换 变量
+ tf::Transform transform;
+ 
+ //每秒订阅 10次 消息
+ ros::Rate rate(10.0);
+ 
+ while (nh.ok()){
+ //初始化坐标变换 变量    与父坐标系的坐标差别固  carrot1 在 turtle1 左边2 米(垂直小乌龟肚子)
+// transform.setOrigin( tf::Vector3(0.0, 2.0, 0.0) );
+ //transform.setRotation( tf::Quaternion(0, 0, 0, 1) );
+ //初始化坐标变换 变量与父坐标系的坐标差别
+  transform.setOrigin( tf::Vector3(2.0*sin(ros::Time::now().toSec()), 2.0*cos(ros::Time::now().toSec()), 0.0) );
+  transform.setRotation( tf::Quaternion(0, 0, 0, 1) );
+ 
+ //发送坐标变换                          变换内容      时间戳    父坐标系（参考坐标系）   子坐标系
+ br.sendTransform( // //带有时间戳类型的坐标变换内容类型
+                  tf::StampedTransform(transform, ros::Time::now(), "turtle1", "carrot1")
+                  );
+ rate.sleep();
+ }
+ return 0;
+};
+```
+
+> 6 tf_monitor 坐标变换监视器
+
+    rosrun tf tf_monitor
+    
+    tf_monitor <source_frame> <target_target>
+    rosrun tf tf_monitor /base_footprint /odom
+    
+> 7  tf_echo显示消息
+
+    tf_echo <source_frame> <target_frame>
+    rosrun tf tf_echo /map /odom
+   
+>  8  static_transform_publisher 坐标变换发布器
+
+	8.1  static_transform_publisher x y z yaw pitch roll frame_id child_frame_id period_in_ms
+
+	Publish a static coordinate transform to tf using an x/y/z offset in meters and yaw/pitch/roll in radians.
+	(yaw is rotation about Z, pitch is rotation about Y, and roll is rotation about X).
+	The period, in milliseconds, specifies how often to send a transform. 100ms (10hz) is a good value.
+
+	8.2  static_transform_publisher x y z qx qy qz qw frame_id child_frame_id  period_in_ms
+
+	Publish a static coordinate transform to tf using an x/y/z offset in meters and quaternion.
+	The period, in milliseconds, specifies how often to send a transform. 100ms (10hz) is a good value.
+
+	命令行和launch 文件 都可调用
+	static_transform_publisher is designed both as a command-line tool for manual use,
+	as well as for use within roslaunch files for setting static transforms.
+	For example:
+	<launch>
+	<node
+	pkg="tf"
+	type="static_transform_publisher"
+	name="link1_broadcaster"
+	args="1 0 0 0 0 0 1 link1_parent link1 100" />  //x y z qx qy qz qw frame_id child_frame_id  period_in_ms
+	</launch>
+
