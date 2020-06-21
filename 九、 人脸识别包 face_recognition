@@ -1,0 +1,125 @@
+
+    1、   有一个人脸识别服务器   Fserver
+
+	roscd face_recognition
+	rosrun face_recognition Fserver
+
+	消息  FaceRecognitionGoal
+	 消息类型 int order_id   string order_argument
+		      模式                名字
+	 order_id = 0       检测识别第一张人脸 当置信度大于置信度阈值时  向客户端 返回 人名字 和 置信度(可信度)
+	 order_id = 1       循环检测识别人脸   当置信度大于置信度阈值时  向客户端 返回 人名字 和 置信度(可信度)
+	 order_id = 2 and order_argument = 'person_name'
+			    添加训练照片素材数据  从摄像头捕获照片放置于 /data下  在 train.txt 添加新数据列表
+			    当照片素材达到参数add_face_number指定的人脸数量时 结束
+	 order_id = 3       训练新的 人脸识别 数据库 facedata.xml
+	 order_id = 4       退出
+
+	订阅话题      
+	/camera/image_raw (standard ROS image transport) 
+	A video stream    照相机节点 发布数据到 /camera/image_raw  话题上
+
+	可配置 参数 列表
+
+	置信度阈值 confidence_value  (double, default = 0.88) 
+	屏幕输出   show_screen_flag (boolean, default = true)
+	指定 order_id = 2  的采集数量      add_face_number (int, default = 25)
+
+      
+      2、人脸识别客户端 Fclient
+	订阅的话题 fr_order (face_recognition/FRClientGoal) 
+	FRClientGoal 消息  order_id and an order_argument
+	指定 Fserver 的工作模式
+	当 话题fr_order上收到消息后  Fclient 向 Fserver 发送识别模式
+	Fserver 将识别结果 发送给 Fclient ，Fclient 将结果打印输出至屏幕 （控制台 console）
+
+
+      3、步骤
+       
+	1、安装 照相机驱动程序 获取视频流 usb_cam
+	  cd catkin_ws/src
+	  git clone git://github.com/bosch-ros-pkg/usb_cam.git
+	  catkin_make
+	  source ~/catkin_ws/devel/setup.bash
+
+	  其他也有 cv_camera
+	  cd catkin_ws/src
+	  git clone git://github.com/OTL/cv_camera.git
+	  catkin_make
+	  source ~/catkin_ws/devel/setup.bash
+
+
+
+      2、运行roscore
+
+      3、启动照相机 获取视频流 发布到 /usb_cam/image_raw 等话题
+	      包      节点    参数重映射(remap) 特定话题名 Fserver订阅的话题     <usb_cam_height>  <usb_cam_width>
+	rosrun usb_cam usb_cam_node usb_cam_node/image_raw:=camera/image_raw _image_height:=800 _image_width:=800
+	上面的命令行好像有问题，用下面的launch文件
+	
+	或者launch文件      
+
+	 <launch>
+	  <node name="usb_cam" pkg="usb_cam" type="usb_cam_node" output="screen" >
+	    <param name="video_device" value="/dev/video0" />
+	    <param name="image_width" value="640" />
+	    <param name="image_height" value="480" />
+	    <param name="pixel_format" value="yuyv" />
+	    <param name="camera_frame_id" value="usb_cam" />
+	    <param name="io_method" value="mmap"/>
+	    <remap from="/usb_cam/image_raw" to="camera/image_raw"/>
+	  </node>
+	  <node name="image_view" pkg="image_view" type="image_view" respawn="false" output="screen">
+	    <remap from="image" to="camera/image_raw"/>
+	    <param name="autosize" value="true" />
+	  </node>
+	</launch>
+
+       
+       4、运行人脸识别服务器和客户端
+       rosrun face_recognition Fserver
+       rosrun face_recognition Fclient
+
+        或编写launch文件
+        
+	<launch>
+	  <node name="usb_cam" pkg="usb_cam" type="usb_cam_node" output="screen" >
+	    <param name="video_device" value="/dev/video0" />
+	    <param name="image_width" value="640" />
+	    <param name="image_height" value="480" />
+	    <param name="pixel_format" value="yuyv" />
+	    <param name="camera_frame_id" value="usb_cam" />
+	    <param name="io_method" value="mmap"/>
+	    <remap from="/usb_cam/image_raw" to="camera/image_raw"/>
+	  </node>
+	  <node name="Fserver" pkg="face_recognition" type="Fserver" output="screen" launch-prefix="xterm -e" >
+	    <param name="confidence_value" value="0.66" />
+	    <param name="add_face_number" value="50" />
+	  </node>
+	  <node name="Fclient" pkg="face_recognition" type="Fclient" output="screen" launch-prefix="xterm -e"/>
+	  <node name="image_view" pkg="image_view" type="image_view" respawn="false" output="screen">
+	    <remap from="image" to="camera/image_raw"/>
+	    <param name="autosize" value="true" />
+	  </node>
+	</launch>
+
+            
+       
+      5、添加训练数据
+       
+                发送一次  话题           消息数据               order_id   order_argument
+       rostopic pub -1 /fr_order face_recognition/FRClientGoal -- 2 "xiaowen"
+       
+      6、开始训练 新的 识别器
+       rostopic pub -1 /fr_order face_recognition/FRClientGoal -- 3 "none"
+       
+      7、开始识别 人脸
+       rostopic pub -1 /fr_order face_recognition/FRClientGoal -- 1 "none"    //循环识别
+       
+       
+      8、重复 5 6 7 可以识别新的人脸
+      9、退出
+       rostopic pub -1 /fr_order face_recognition/FRClientGoal -- 4 "none"
+       
+       
+   
