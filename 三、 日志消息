@@ -1,0 +1,235 @@
+	ROS_INFO_STREAM     （information 信息 stream  流）
+	的宏给用户展示了丰富的消息。这些消息就是  志消息的例子。
+	ROS 提供了一个包括 ROS_INFO_STREAM 在内、 具有很多其他特性的日志系统。
+
+	严重级别
+	与大多数通用软件日志系统类似,ROS日志系统的核心思想,
+	就是使程序生成一些简短的文本字符流,这些字符流便是日志消息。
+	ROS中,日志消息分为五个不同的严重级别,也可简称为严
+	重性或者级别。按照严重性程度递增,
+	这些级别有:
+
+	类型      示例
+	DEBUG   reading header from buffer                          （调试信息经常出现）
+	INFO    Waiting for all connections to establish             （正常的通知消息）
+	WARN    Less than 5GB of space free on disk                   （警告消息）
+	ERROR   Publisher header did not have required element: type   （错误消息）
+	FATAL    You must call ros::init() before creating the firstNodeHandle 
+	（致命性的错误消息  程序有问题的提示消息）
+
+
+	我们将学习如何通过定义允许的严重级来过滤或者强调一些消息。然而,这些级别本身并不包含任何
+	内在的含义:生成一个 FATAL 消息并不会终止你的程序;同样地,生成一个 DEBUG 消息并不会调试你的程序。
+
+	使用turtlesim 就 可 以 达 到 这 个 目 的 , 因 为 在 适 当 的 条 件 下 ,
+	turtlesim_node 可以生成除 FATAL 以外各个级别的日志消息。
+	虽然不能生成所有严重级别的日志消息,但是从学习的目的出发,
+	使用这样一个能够按要求生成可预测严重程度日志消息的程序非常方便。
+
+```c
+//发布一次消息
+ // Don't do this directly. Use ROS_..._STREAM_ONCE instead.
+{
+static bool first_time = true ;
+if (first_time) {
+ROS_INFO_STREAM( "Here's some important information"
+<<" that will only appear once.");
+first_time = false;
+  }
+}
+    
+ #include <ros/ros.h>
+int main ( int argc , char **argv ) {
+ros::init(argc, argv, "log_once");
+ros::NodeHandle nh ;
+while( ros::ok( )){
+  ROS_DEBUG_STREAM_ONCE( "This appears only once. " );
+  ROS_INFO_STREAM_ONCE( "This appears only once. " );
+  ROS_WARN_STREAM_ONCE( "This appears only once. " );
+  ROS_ERROR_STREAM_ONCE( "This appears only once. " );
+  ROS_FATAL_STREAM_ONCE( "This appears only once. " );
+}
+  }
+  
+  //轮询定时发送消息 （耗费 cpu 不推荐）
+  ROS_ERROR_STREAM_THROTTLE(1.0, "This appears every 1.0 seconds.") ;
+```
+   
+	实际上,日志消息有三个不同的目的地:每一个日志消息可以在控制台输出(屏幕),
+	可以是 rosout 话题的消息,也可写入到日志文件中。
+   
+   【1】控制台输出
+   
+	具体而言,DEBUG和INFO消息被打印至标准输出(standard output),
+	而WARN、ERROR和FATAL消息将被送至标准错误(standard error)
+
+	标准输出和标准错误之间的区别是无关紧要的,除非你想要将其中一个或者这两个流输出重定向到一个文件
+	或管道,这种情况比较复杂,通常的文件重定向技术
+        command > file   只重定向标准输出,不包括标准错误。
+	为了将所有日志消息重定向到同一个文件,可以使用类似如下命令:
+	command &> file
+
+
+	然而,需要注意的是,由于这两种流的缓存方式不同, 可能导致消息不按照顺序出现——在结果中 DEBUG 和
+	INFO 消息可能出现得比你预想的靠后。你可以使用 stdbuf   命令使标准输出采用行缓存方式,从而强制让消息按照正
+	常顺序输出:
+	stdbuf -oL command &> file
+	最后,注意 ROS 会在输出中插入人类和软件无法理解的 ANSI 颜色编码,这些编码类似^[[0m],即使这些输出不是
+	定向到终端中。查看一个包含这些编码的文件,可以使用
+	如下命令:
+	less -r file    repaint the screen
+
+	格式化控制台消息
+	可以通过设置 ROSCONSOLE_FORMAT 环境变 量来调整日志消息打印到控制台的格式。该环境变量通常包含一
+	个或多个域名,每一个域名由一个美元符号$和一对大括号{}来表,用来指出日志消息数据应该在何处插入。
+
+	默认的格式是:
+	ROSCONSOLE_FORMAT =   [${severity}] [${time}]: ${message}
+			消息严重类型     时间       消息
+	DEBUG INFO WARN ERROR FATAL 中的一个
+
+	这个格式可能适合大部分的应用,但是还有一些其他的域也是很 有用的 :
+	为了插入生成日志消息的源代码位置,可以使用${file}、 ${line} 和${function}域的组合形式。
+	为了插入生成日志消息的节点名称,可以使用${node}域。
+
+	roslaunch 工具(将在第 6 章介绍)默认并不会将标准输出
+	和标准错误从其生成的节点导入至自己的输出流。为了查
+	看使用 roslaunch 启动节点的输出,你必须显式地使用 output=”screen”属性,
+	或者对 roslaunch 命令使用—screen
+	参数来强制使所有节点应用这个属性,
+
+
+
+  【2】 rosout 上的消息
+  
+	rostopic echo /rosout   显示话题上的时时消息
+	rostopic info /rosout
+
+	Type: rosgraph_msgs/Log     //消息类型
+
+	Publishers: 
+	* /rostopic_4299_1488883490830 (http://ewenwan-Lenovo-G480:44305/)
+	* /rqt_gui_py_node_4533 (http://ewenwan-Lenovo-G480:34204/)
+	* /count_and_log (http://ewenwan-Lenovo-G480:45080/)
+
+	Subscribers: 
+	* /rosout (http://ewenwan-Lenovo-G480:39512/)
+	* /rostopic_4299_1488883490830 (http://ewenwan-Lenovo-G480:44305/)
+
+
+	rosmsg show rosgraph_msgs/Log
+
+	byte DEBUG=1
+	byte INFO=2
+	byte WARN=4
+	byte ERROR=8
+	byte FATAL=16
+	std_msgs/Header header
+	uint32 seq
+	time stamp
+	string frame_id
+	byte level
+	string name
+	string msg
+	string file
+	string function
+	uint32 line
+	string[] topics
+
+
+	rqt_console      日志消息的图形界面显示  控制台 console
+
+    
+    
+  【3】  日志文件
+         
+	日志消息的第三个,也是最后一个目的地,是由 rosout 节点
+	生成的日志文件。作为/rosout 话题回调函数的一部分,该节点可
+	以将日志消息作为一行写入到一个日志文件,文件名类似于:
+	~/.ros/log/run_id/rosout.log
+
+	less  ~/.ros/log/76944ed4-0322-11e7-9ede-95eac9800164/rosout.log
+	这里的 rosout.log 日志文件是纯文本文件。它可以利用 less、 head
+	或者 tail 等命令行工具、或者是你喜欢的文本编辑器查看。运行
+	标识码(run_id)是一个通用唯一识别码(UUID),它在节点管理
+	器开始运行时基于你计算机的 MAC 地址和当前的时间生成。下面
+	是一个 run_id 的例子:
+	57aa1860-d765-11e2-a830-f0def1e189cc
+	使用这类唯一标识码,可以区分来自不同 ROS 会话的日志文件。
+
+	查找运行标识码:====================
+	至少有两种简单方法可以查看当前会话的    run_id
+
+	1)   通过检查 roscore 生成的输出,在靠近输出末端的位置,可以看到与下面内容类似的一行
+	     setting /run_id to run_id
+	2)   通过以下命令向节点管理器询问当前的 run_id
+	     rosparam get /run_id
+	  由于 run_id 存放在参数服务器上,因此该命令是有效的。
+	  rosparam get /run_id
+
+	 76944ed4-0322-11e7-9ede-95eac9800164
+
+	检查和清除日志文件:=========================
+	这些日志文件将随着时间累积。如果你长
+	期在一个对存储空间有着严格限制(由于账户配额或者是硬件限制)的系统上运行ROS,就会出现问题。
+	roscore和roslaunch运行
+	时都会检查和监测已经存在的日志的大小,并会在日志文件大小
+	超过 1GB时提醒你,但是并不会采取任何的措施来减小日志文件
+	大小。也可以使用下面这条命令来查看当前账户中被ROS日志消耗的硬盘空间  :
+
+	rosclean check
+	如果日志正在消耗过多的硬盘空间,可以通过下面的命令删除所
+	有已经存在的日志:
+	
+	rosclean purge
+	如果你愿意,也可以手动删除这些日志文件。
+
+
+	启用和禁用日志消息:==================================
+	这是一个关于日志级别的具体例子,对每一个节点都指明了
+	最低的严重级别。默认的日志级别是 INFO,这就解释了在我们的
+	示例程序中为什么没有生成 DEBUG 级别的消息。日志级别背后通
+	常的思路是在运行时提供调整每个节点日志细节程度的能力。
+
+	设置日志级别类似于 rqt_consolt 中的日志级别过滤选项。
+	不同的是,改变日志级别将阻止日志消息的源头生成相应
+	的消息,而 rqt_console 会接收任何输入的日志消息,其过
+	滤选项只是选择性地显示其中的一部分。除了系统开销以
+	外,效果是类似的。
+
+        设置某个节点的日志级别有几种方法:==================
+  
+	1) 通过命令行设置日志级别=======
+	为了通过命令行设置一个节点的日志级别,可以使用与以下类似的命令:
+	rosservice call /node-name/set_logger_level ros.package-name level
+	命令调用 set_logger_level 服务,该服务由各个节点自动提供
+
+	node-name 是你期望设置日志级别的节点名称
+	package-name 正如你猜测的一样,是拥有这个节点的功能包的名称
+	level 参数是 DEBUG、INFO、WARN、ERROR、FATAL 中的一个字符串,即为节点设置的日志级别
+
+	例如：
+
+	rosservice call /count_and_log/set_logger_level ros.agitros DEBUG   //启用DEBUG以上的日志消息提示
+	由于这条命令直接与节点进行交互,我们不能应在节点启动后使用它。
+
+	2)通过图形界面设置日志级别===========
+	rqt_logger_level
+
+
+	3)通过 C++代码设置日志级别===========
+
+	节点改变自身的日志级别也是可能
+	的。最直接的方式是调用 ROS 来实现日志功能的 log4cxx 提供的接口,代码如下:
+
+	#include <log4cxx/logger.h>
+	. . .
+	log4cxx::Logger::getLogger(ROSCONSOLE_DEFAULT_NAME)->setLevel(
+	ros::console::g_level_lookup[ros::console::levels::Debug]);
+	ros::console::notifyLoggerLevelsChanged();
+
+	除了必要的语法理解,这些代码应该很容易识别是将日志级别设置为 DEBUG。
+	Debug 这个标识当然可以替换为 Info、Warn、Error 或者 Fatal。
+	调用 ros::console::notifyLoggerLevelsChanged()是有必要的,
+	因为每个日志的启用或者禁用是缓存了的。如果你在生成任何日志消息之前就已经设置了日志级别,那么上述调用就可以省略。
+
