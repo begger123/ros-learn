@@ -1,0 +1,175 @@
+> a 可视化日志
+
+	rqt_console
+
+	属于ROS日志框架(logging framework)的一部分，用来显示节点的输出信息。
+	rqt_logger_level
+
+	 允许我们修改节点运行时输出信息的日志等级（logger levels）
+	（包括 DEBUG、WARN、INFO和ERROR）。
+
+> b 录制消息/数据 与回放
+
+	mkdir ~/bagfiles   //建立一个用于录制的临时目录
+
+	cd ~/bagfiles      //进入
+
+	rosbag record -a   //录制所有
+
+	rosbag info <your bag file>   显示记录内容
+
+	rosbag play <your bag file>    回放 节点动态最后一个可能比较有趣的
+
+	参数选项是-r选项，它允许你通过设定一个参数来改变消息发布速率。 
+
+	rosbag play -r 2 <your bag file>   2倍速度回放
+
+	//录制指定话题数据
+	rosbag record -O subset /turtle1/command_velocity /turtle1/pose
+
+
+	设计精良的 ROS 系统的一个重要特征便是系统中信息的消费者不应该关心信息的生产者。
+	这种体系架构最明显的体现是 ROS主要使用的消息发布 - 订阅通信模型。
+	在这个模型下,不论什么时刻,只要有消息被发布,其订阅节点就应该正常工作,而不管
+	是哪个或是哪些节点正在发布这些消息。
+	本章将介绍一个体现这种灵活性的具体例子,即一种被称为rosbag 的工具。通过 rosbag,
+	我们能够将发布在一个或者多个话题上的消息录制到一个包文件中,然后可以回放这些消息,
+	重现相似的运行过程。将这两种能力结合,便形成了测试某些机器人软件的有效方式:
+	我们可以偶尔运行机器人,运行过程中录制关注的话题,然后多次回放与这些话题相关的消息,
+	同时使用处理这些数据的软件进行实验。
+
+	1) 录制与回放包文件
+	术语包文件(bag files)是指用于存储带时间戳的 ROS 消息的特殊格式文件。
+	rosbag 命令行工具可以用来录制和回放包文件。
+	录制包文件
+	要创建一个包文件,使用 rosbag 指令的如下形式: 
+	rosbag record -O filename.bag topic-names
+
+	如果你不指定文件名,rosbag 将基于当前的日期和时间自动生成一个。此外,还有一些命令行选项或许对使用 rosbag record
+	进行消息录制有用。
+	除了像上面一样指定具体的话题外,你还可以使用
+	
+	rosbag record -a   记录当前发布的所有话题的消息。
+
+	对于本书中的种种小规模系统,完全可以其录制所有话题。然而,在许多真实的机器人系统中,这是一个令人沮丧的坏主意。
+	例如,大部分搭载摄像头的机器人系统中存在多个节点发布与图像相关的话题,其中的图像经历了不同阶
+	段的处理和不同级别的压缩。此时如果记录所有的话题,将迅速创建惊人的巨大包文件。因此,使用-a 选项前要三
+	思,或至少应该在录制过程中注意包文件的大小。
+
+	你可以使用 rosbag record -j 启用包文件的压缩。与其他文件压缩一样,这里也需要折衷考虑:通常较小文件的代价是更
+	长的读写时间。作者认为,对于包文件来说,压缩通常是个好主意。
+	当完成包文件录制时,使用 Ctrl-C 停止 rosbag。
+
+	2)  回放包文件 要回放一个包文件,可以使用如下命令:
+	rosbag play filename.bag
+	存储在包文件中的消息将被回放,而且回放时会保持与其原始发布时同样的顺序和时间间隔。
+
+	3)  检查文件包
+	rosbag info 指令可以提供某个包文件中的丰富信息:
+	rosbag info filename.bag
+
+	示例:正方形运动轨迹的包文件      
+	绘制正方形轨迹(Drawing squares) 首先,启动 roscore 和turtlesim_node 两个节点。
+	然后从 turtlesim 功能包中启动一个 draw_square 节点(系统自带):
+	录制：
+	mkdir bagfiles   //创建存放包文件的文件夹
+	cd bagfiles
+	roscore
+	rosrun turtlesim  turtlesim_node
+	rosrun turtlesim draw_square
+	//                 包文件名      话题1           话题2
+	rosbag record -O square.bag /turtle1/cmd_vel /turtle1/pose
+
+	^C 结束录制  并结束 draw_square 节点
+
+	回放：
+	rosbag play square.bag
+	请注意,海龟将恢复运动。这是因为rosbag创建了名为play...的节点,
+	且这个节点正在发布话题/turtle1/cmd_vel的消息,
+
+
+	始的 draw_square 和 rosbag play 把海龟发送到了不同的地方,
+	即使这个包文件里面有来自/ turtle1/pose 话题的数据。
+	这又是为什么呢?很简单,因为在这个例子中,
+	除 rosbag record 外没有其他节点订阅/ turtle1/pose 话题。
+	系统中某个或某些节点(这里是 rosbag play)发布海龟所在的位置,
+	和实际上海龟所在的位置是可以不同的。
+	本例中,包文件里面的位姿数据被忽略了。
+
+          
+        launch文件中启用包文件：
+
+	更重要的是,通过这两个可执行文件可以很容易地将包文件
+	作为启动文件的一部分,方法是包含适当的节点元素。例如,一
+	个录制节点可能是这样的:
+	<node
+	pkg="rosbag"
+	name="record"
+	type="record"
+	args="-O filename.bag topic-names"
+	/>
+	与此类似,一个回放节点可能如下所示:
+	<node
+	pkg="rosbag"
+	name="play"
+	type="play"
+	args="filename.bag"
+	/>
+
+      检查文件包
+      rosbag info 指令可以提供某个包文件中的丰富信息:
+      rosbag info filename.bag
+      
+       rosbag info square.bag.active
+
+	>>>>>>
+	path:        square.bag.active
+	version:     2.0
+	duration:    1:18s (78s)
+	start:       Mar 13 2017 16:44:21.96 (1489394661.96)
+	end:         Mar 13 2017 16:45:40.72 (1489394740.72)
+	size:        888.5 KB
+	messages:    9821
+	compression: none [1/1 chunks]
+	types:       geometry_msgs/Twist [9f195f881246fdfa2798d1d3eebca84a]
+		     turtlesim/Pose      [863b248d5016ca62ea2e895ae5265cf9]
+	topics:      /turtle1/cmd_vel   4898 msgs    : geometry_msgs/Twist
+		     /turtle1/pose      4923 msgs    : turtlesim/Pose
+
+
+# 11、arduino 连接
+
+	linux 管理员权限打开：
+	
+	arduino idesudo /home/wyw/SoftWare/arduino-1.6.7/arduino
+	sudo  arduino安装路径
+	
+	获取权限 ：
+	/dev/ttyS2sudo usermod -a -G tty wyw            //wyw  用户名
+	sudo usermod -a -G dialout wyw
+
+
+	与arduino通信：
+        rosrun rosserial_python serial_node.py /dev/ttyS2
+
+
+# 12、运行tf（坐标变换）小乌龟仿真 
+
+	demo安装
+	sudo apt-get install ros-jade-ros-tutorials ros-jade-geometry-tutorials ros-jade-rviz ros-jade-rosbash ros-jade-rqt-tf-tree
+
+	运行
+	roslaunch turtle_tf turtle_tf_demo.launch
+
+	查看坐标变化图
+	rosrun tf view_framesevince frames.pdf
+
+	查看node话题发布订阅图标
+	rosrun rqt_tf_tree rqt_tf_tree
+
+	展现坐标系变化
+	rosrun tf tf_echo [reference_frame] [target_frame]
+	rosrun tf tf_echo turtle1 turtle2rviz
+
+	坐标变换可视化工具
+	rosrun rviz rviz -d `rospack find turtle_tf`/rviz/turtle_rviz.rviz
