@@ -1,0 +1,512 @@
+    创建包
+    cd catkin_ws/src
+    catkin_create_pkg actionlib_lutorials actionlib message_generation roscpp rospy std_msgs actionlib_msgs
+    
+> 1、运动服务器的编写 Action Server
+
+	斐波纳契 序列 运动效果的产生   
+	Fibonacci sequence
+	目标  序列的顺序      the order of the sequence,
+	反馈  计算好的序列    the sequence as it is computed,
+	结果  最终生成的序列  the final sequence.
+	
+     1) 编写运动的消息文件 Fibonacci.action 
+        文件为运动定义了 目标、结果和反馈话题的类型 
+       actionlib_tutorials/action/Fibonacci.action
+
+	## 会在 /catkin_ws/devel/include/actionlib_lutorials/下生成一系列 以文件名+Action为开头的库文件
+	## FibonacciAction.h  FibonacciActionFeedback.h   FibonacciActionGoal.h FibonacciActionResult.h
+
+	# 以及以文件名为开头的库文件
+	#FibonacciFeedback.h   FibonacciGoal.h FibonacciResult.h
+	#goal definition   定 义 目标 话题 类型 序列的顺序
+	int32 order
+	---
+	#result definition 定义结果 话题类型 最终生成的序列 数组类型
+	int32[] sequence
+	---
+	#feedback          定义反馈 话题类型 计算好的序列  组类型
+	int32[] sequence
+
+
+    2) 编辑 CMakeLists.txt 文件
+    
+	a）  确保 包依赖有 actionlib_msgs
+	 find_package(catkin REQUIRED COMPONENTS actionlib_msgs)
+	b)   添加系统依赖
+	 find_package(Boost REQUIRED COMPONENTS system)
+	c）  添加 action files 文件
+	 add_action_files(
+	 DIRECTORY action
+	 FILES Fibonacci.action)
+	d)   调用消息生成镜像 生成actionlib消息头文件
+	 generate_messages(DEPENDENCIES actionlib_msgs std_msgs )
+	e)   添加 编译包镜像
+	catkin_package(CATKIN_DEPENDS actionlib_msgs)
+
+	f)   添加包含路径
+	 include_directories(
+	 include
+	 ${catkin_INCLUDE_DIRS}
+	 ${Boost_INCLUDE_DIRS} )
+	g） 可执行文件等
+
+	# 斐波纳契 序列 运动效果生成 序列  服务器
+	add_executable(fibonacciServer src/fibonacciServer.cpp)
+	target_link_libraries(fibonacciServer  ${catkin_LIBRARIES} )
+	add_dependencies(fibonacciServer ${actionlib_lutorials_EXPORTED_TARGETS})
+
+	# 斐波纳契 序列 运动效果生成 客户端 发送 目标序列
+	#                  编译生存的可执行文件名   源文件名
+	add_executable(fibonacciClient src/fibonacciClient.cpp)
+	# 链接库
+	target_link_libraries(fibonacciClient  ${catkin_LIBRARIES} )
+	# 依赖库
+	add_dependencies(fibonacciClient ${actionlib_lutorials_EXPORTED_TARGETS})
+
+
+    
+    3) 进行编译 自动生成 运动 消息文件 库 类似 自定义的消息文件一样（会生成头文件）
+    
+	cd catkin_ws/
+	catkin_make
+	在 catkin_ws/devel/include/actionlib_lutorials 下生成一系列头文件
+	比如运动 目标、结果、反馈的头文件
+	#include <actionlib_lutorials/FibonacciActionGoal.h>
+	#include <actionlib_lutorials/FibonacciActionResult.h>
+	#include <actionlib_lutorials/FibonacciActionFeedback.h>
+	还在FibonacciAction.h中生成了 actionlib_lutorials 包的类
+
+        
+// fibonacciServer.cpp  
+
+```c
+#include <ros/ros.h>                               //ros系统文件
+#include <actionlib/server/simple_action_server.h>
+//系统本身的 简单运动服务器库 actionlib::SimpleActionServer
+#include <actionlib_lutorials/FibonacciAction.h>   
+//添加actionlib_lutorials/FibonacciAction.h 文件 catkin_make 生成的库文件
+
+//using namespace actionlib_lutorials;  
+//使用  包名定义的actionlib_lutorials名字空间 下面一些类可省去 名字空间
+//使用名字 空间 可能会造成 类调用不明确（来源不明确）
+//actionlib::SimpleActionServer 来自<actionlib/server/simple_action_server.h>
+//actionlib_lutorials::FibonacciAction 来自<actionlib_lutorials/FibonacciAction.h>
+typedef actionlib::SimpleActionServer<actionlib_lutorials::FibonacciAction> Server; //定义运动服务器
+
+//自定义类
+class FibonacciAction{
+  //受保护的 自定义类型
+protected:
+  ros::NodeHandle nh_;  //节点句柄  自定义类变量末尾带下划线 而调用时则不用
+  Server as_;           //运动服务器
+  std::string action_name_;//运动 名字
+ actionlib_lutorials::FibonacciFeedback feedback_; //反馈
+ actionlib_lutorials::FibonacciResult result_;     //结果
+
+public:
+  //定义运动服务器 函数结构   服务器名字
+  FibonacciAction(std::string name):
+    //服务器 节点 名字                  可执行函数
+     as_(nh_,name,boost::bind(&FibonacciAction::executeCB,this,_1),false),action_name_(name){
+    as_.start();
+  }
+   //析构函数
+   ~FibonacciAction(void)
+    {}
+  //可执行函数                                 目标
+  void executeCB(const actionlib_lutorials::FibonacciGoalConstPtr &goal){
+    ros::Rate rate(1);   //频率
+   bool success=true; //标志
+   feedback_.sequence.clear(); //反馈序列初始化 清零
+   feedback_.sequence.push_back(0); //反馈序列初始化 加入种子点
+   feedback_.sequence.push_back(1);
+   ROS_INFO("%s: Executing, creating fibonacci sequence of order %i with seeds %i, %i", 
+             action_name_.c_str(), goal->order, feedback_.sequence[0], feedback_.sequence[1]);
+   //生成序列
+   for(int i=0;i<=goal->order;i++){
+    //确保Preempt没被 客户端请求
+     if(as_.isPreemptRequested()||!ros::ok()){
+       ROS_INFO("%s: Preempted", action_name_.c_str());
+       as_.setPreempted();
+       success=false;
+       break;
+     }
+     //
+     feedback_.sequence.push_back(feedback_.sequence[i]+feedback_.sequence[i-1]);
+     as_.publishFeedback(feedback_);
+
+     rate.sleep();
+   }
+   
+   if(success){
+     ROS_INFO("%s: Succeeded", action_name_.c_str());
+     result_.sequence=feedback_.sequence;
+     //同志客户端 生成 序列成功
+     as_.setSucceeded(result_);
+   }
+
+  }
+};
+
+int main(int argc, char** argv)
+{
+  ros::init(argc, argv, "fibonacci");//初始化节点
+  // 服务器函数                     服务器名字
+  FibonacciAction fibonacci(ros::this_node::getName());
+  //若 using namespace actionlib_lutorials; 可能会造成调用不明确
+  ros::spin();
+  return 0;
+}
+```
+
+        
+        
+```c        
+/*
+ * fibonacciClient.cpp
+ *
+ *  Created on: March 16, 2017
+ *      Author: EwenWan
+ */
+#include <ros/ros.h>  //ros系统文件
+#include <actionlib/client/simple_action_client.h> //系统本身的 简单运动服务器库actionlib::SimpleActionClient
+#include <actionlib/client/terminal_state.h>       ////系统本身的 终端状态库
+#include <actionlib_lutorials/FibonacciAction.h>   //添加actionlib_lutorials/FibonacciAction.h 文件 catkin_make 生成的库文件
+using namespace actionlib_lutorials;//使用  包名定义的actionlib_lutorials名字空间 下面一些类可省去 名字空间
+//actionlib::SimpleActionServer 来自<actionlib/server/simple_action_server.h>
+//actionlib_lutorials::FibonacciAction 来自<actionlib_lutorials/FibonacciAction.h>
+typedef actionlib::SimpleActionClient<FibonacciAction> Client; //定义运动客户端 请求
+
+int main (int argc, char **argv)
+{
+ros::init(argc, argv, "test_fibonacci");//初始化ros系统 注册节点
+// 定义客户端  链接的服务器名字   自动开始线程      
+Client ac("fibonacci",true);
+ROS_INFO("wait action server to start");
+ac.waitForServer();
+ROS_INFO("action server started,sending goal");
+
+FibonacciGoal goal;
+goal.order=20;
+//发送 序列 目标 次序
+ac.sendGoal(goal);
+//完成标志
+bool finish_before_timeout=ac.waitForResult(ros::Duration(30));
+
+//完成了
+if(finish_before_timeout){
+  actionlib::SimpleClientGoalState state=ac.getState();
+  ROS_INFO("action finished :%s",state.toString().c_str());
+
+}
+//未完成
+else{
+  ROS_INFO("action did not finished");
+}
+ return 0;
+}
+```
+        
+        
+> 2、可视化 marker with rviz
+
+	cd catkin_ws/src
+	catkin_create_pkg using_markers_rviz roscpp visualization_msgs
+	创建一些发布立体形状的发布者  rviz来订阅  在rviz中显示
+
+	基本形状显示   立方体形状   sphere 球体   arrow 箭头  cylinder 圆柱体
+	
+//basicShapes.cpp
+```c     
+ #include <ros/ros.h>                    //系统文件 
+#include <visualization_msgs/Marker.h>  // 可视化物体 marker类型 visualization_msgs::Marker
+
+int main( int argc, char** argv )
+{                        //节点名称
+  ros::init(argc, argv, "basic_shapes"); //初始化ros系统 注册节点
+  ros::NodeHandle nh;                    //在节点管理器中注册节点
+  ros::Rate rate(2);                     //发布频率(控制 立体形状变换速度)
+  //
+  ros::Publisher marker_pub;             //创建发布者       话题名字             序列大小
+  marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+  //立方体形状  shape
+  uint32_t shape = visualization_msgs::Marker::CUBE;//立方体形状 
+
+  while (ros::ok())
+  {
+    //可视化形状 消息 
+    visualization_msgs::Marker marker;
+    // Set the frame ID and timestamp.  See the TF tutorials for information on these.
+    //坐标系
+    marker.header.frame_id = "/my_frame";//立体形状的参考系   在rviz中 Fixed Frame 需要选择为/my_frame
+    //时间戳
+    marker.header.stamp = ros::Time::now();
+// %Tag(NS_ID)%
+    //           命名空间
+    marker.ns = "basic_shapes";
+    //标志号
+    marker.id = 0;
+//形状 初始 为//立方体形状   sphere 球体   arrow 箭头  cylinder 圆柱体
+    marker.type = shape;  //形状标志变量
+    //操作 添加ADD 去除DELETE   去除全部 DELETEALL
+    marker.action = visualization_msgs::Marker::ADD;
+    //姿态    位置position   方向orientation
+    marker.pose.position.x = 0;
+    marker.pose.position.y = 0;
+    marker.pose.position.z = 0;
+    marker.pose.orientation.x = 0.0;
+    marker.pose.orientation.y = 0.0;
+    marker.pose.orientation.z = 0.0;
+    marker.pose.orientation.w = 1.0;
+//大小   单位米
+    marker.scale.x = 1.0;
+    marker.scale.y = 1.0;
+    marker.scale.z = 1.0;
+//颜色 红绿蓝 透明度
+    marker.color.r = 0.0f;
+    marker.color.g = 1.0f;
+    marker.color.b = 0.0f;
+    marker.color.a = 1.0;
+    //有效时间  ros::Duration();不会自动删除
+    marker.lifetime = ros::Duration();
+    // 发布 形状
+    while (marker_pub.getNumSubscribers() < 1)
+    {  //没有订阅者
+      if (!ros::ok())
+      {
+        return 0;
+      }
+      ROS_WARN_ONCE("Please create a subscriber to the marker");
+      sleep(1);
+    }
+    marker_pub.publish(marker);
+
+    switch (shape)
+    {
+    case visualization_msgs::Marker::CUBE://立方体
+      shape = visualization_msgs::Marker::SPHERE;//球体
+      break;
+    case visualization_msgs::Marker::SPHERE://球体
+      shape = visualization_msgs::Marker::ARROW;//箭头
+      break;
+    case visualization_msgs::Marker::ARROW://箭头
+      shape = visualization_msgs::Marker::CYLINDER;//圆柱体
+      break;
+    case visualization_msgs::Marker::CYLINDER://圆柱体
+      shape = visualization_msgs::Marker::CUBE;//立方体
+      break;
+    }
+    rate.sleep();
+  }
+}
+```
+
+
+//pointsAlines.cpp
+```c
+//点        线带（条）   线表（线段 排列）
+#include <ros/ros.h>                    //系统文件 
+#include <visualization_msgs/Marker.h>  // 可视化物体 marker类型 visualization_msgs::Marker
+#include <cmath>                        //数学库
+int main( int argc, char** argv )
+{
+  ros::init(argc, argv, "pointsAndLines"); //初始化ros系统 注册节点
+  ros::NodeHandle nh;                      //在节点管理器中注册节点
+  ros::Publisher marker_pub;               //创建发布者       话题名字           序列大小
+  marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 10);
+  ros::Rate rate(30);     //发布频率 控制线条摆动速度
+  float f = 0.0;          //浮点变量
+  while (ros::ok())
+  {
+// %Tag(MARKER_INIT)%           点        线带（条）   线表（线段 排列）
+    visualization_msgs::Marker points, line_strip, line_list;
+    //参考坐标系
+    points.header.frame_id = line_strip.header.frame_id = line_list.header.frame_id = "/my_frame";
+    //时间戳
+    points.header.stamp = line_strip.header.stamp = line_list.header.stamp = ros::Time::now();
+    //命名空间
+    points.ns = line_strip.ns = line_list.ns = "points_and_lines";
+    //操作 添加ADD 去除DELETE   去除全部 DELETEALL
+    points.action = line_strip.action = line_list.action = visualization_msgs::Marker::ADD;
+    //方向w
+    points.pose.orientation.w = line_strip.pose.orientation.w = line_list.pose.orientation.w = 1.0;
+    // 标志符号 身份标志
+    points.id = 0;
+    line_strip.id = 1;
+    line_list.id = 2;
+    //形状
+    points.type = visualization_msgs::Marker::POINTS;
+    line_strip.type = visualization_msgs::Marker::LINE_STRIP;
+    line_list.type = visualization_msgs::Marker::LINE_LIST;
+    // 点尺寸 类似直径大小
+    points.scale.x = 0.3;
+    points.scale.y = 0.3;
+    //线带尺寸 线条
+    line_strip.scale.x = 0.1;
+    //线表尺寸
+    line_list.scale.x = 0.1;
+    //点颜色
+    points.color.g = 1.0f; //绿色
+    points.color.a = 1.0;  //透明度
+    //线带颜色
+    line_strip.color.b = 1.0; //蓝色
+    line_strip.color.a = 1.0;
+    //线表颜色
+    line_list.color.r = 1.0;  //红色
+    line_list.color.a = 1.0;
+
+    // Create the vertices for the points and lines
+    for (uint32_t i = 0; i < 200; ++i)  //i 越大 线越长
+    {
+      float y = 5 * sin(f + i / 100.0f * 2 * M_PI);
+      float z = 5 * cos(f + i / 100.0f * 2 * M_PI);
+
+      geometry_msgs::Point p;
+      p.x = (int32_t)i - 50;//线性增长  
+      p.y = y;
+      p.z = z;
+
+      points.points.push_back(p);
+      line_strip.points.push_back(p);
+
+      // 两点确定一条直线  线段序列
+      line_list.points.push_back(p);
+      p.z += 3.0;//改变线段长度
+      line_list.points.push_back(p);
+    }
+// %EndTag(HELIX)%
+
+    while (marker_pub.getNumSubscribers() < 1)
+    {  //没有订阅者
+      if (!ros::ok())
+      {
+        return 0;
+      }
+      ROS_WARN_ONCE("Please create a subscriber to the marker");
+      sleep(1);
+    }
+    marker_pub.publish(points);
+    marker_pub.publish(line_strip);
+    marker_pub.publish(line_list);
+
+    rate.sleep();
+    f += 0.04;
+  }
+}
+```
+
+> 2、交互式 marker  可交互操作的 立体形状
+
+	rviz 和 交互式marker服务器 订阅 node发布的消息，
+	当有鼠标等交互式操作时，交互式marker服务器更新消息至话题
+	允许系统自带 节点
+	rosrun interactive_marker_tutorials basic_controls
+	rviz
+	1）、Globai Options 中的Fixed Frame 可选 参考坐标系有：
+	bsse_link(固定参考系) moving_frame(上下移动参考系) rotating_frame(旋转参考系)
+
+	2)、ADD 添加 Interactive Markers 显示物体
+	3)、在出现的Interactive Markers 下设置 Update Topic  参数
+
+	设置为 /basic_controls/update
+
+	系统自带的除了basic_controls 还有：cube menu point_cloud  pong selection  simple_marker 等
+
+     
+> 在线更新参数服务器的值
+     
+	打开参数配置面板
+	rosrun rqt_reconfigure rqt_reconfigure
+	或者 rosrun rqt_gui rqt_gui(所有配置面板) >>>plugins(插件)>>>Configuation>>>Dynamic reconfigure
+	只有节点使用了rqt_reconfigure API 才支持在 rqt_reconfigure GUI 窗口中更改参数
+	如 Navigation包支持 turtlesim 不支持
+
+	编写带有rqt_reconfigure API的节点  让节点支持在线更新参数
+
+	1、创建配置文件 .cfg file
+	catkin_create_pkg --rosdistro ROSDISTRO dynamic_tutorials rospy roscpp dynamic_reconfigure
+	ROSDISTRO  是ros发行版本
+			      ros版本      包名               依赖
+	catkin_create_pkg --rosdistro indigo dynamic_tutorials rospy roscpp dynamic_reconfigure
+	 cd dynamic_tutorials
+	 
+	 mkdir cfg
+```python   
+#Tutorials.cfg       
+#!/usr/bin/env python
+#20170318
+#auther:wanyouwen ewenwan
+PACKAGE_NAME = "dynamic_tutorials"#package name  initialize ros system
+NODE_NAME = "dynamic_tutorials"
+GENERATE_FILE_PREFIX_NAME = "Tutorials" # e.g. "<name>Config.h" for c++, or "<name>Config.py" for python. 
+from dynamic_reconfigure.parameter_generator_catkin import *  # import the parameter generator support
+gen = ParameterGenerator() #define a parameter generator
+#The add function adds a parameter to the list of parameters
+#type - defines the type of value stored, and can be any of int_t, double_t, str_t, or bool_t 
+         # name         type    level  description  default value  min_value  max_value 
+gen.add("int_param",    int_t,    0, "An Integer parameter", 50,  0, 100)
+gen.add("double_param", double_t, 0, "A double parameter",    .5, 0,   1)
+gen.add("str_param",    str_t,    0, "A string parameter",  "Hello World")
+gen.add("bool_param",   bool_t,   0, "A Boolean parameter",  True)
+#define an integer whose value is set by an enum(mei ju)
+#                        constant  name         type  level   discription  
+size_enum = gen.enum([ gen.const("Small",      int_t, 0, "A small constant"),
+                       gen.const("Medium",     int_t, 1, "A medium constant"),
+                       gen.const("Large",      int_t, 2, "A large constant"),
+                       gen.const("ExtraLarge", int_t, 3, "An extra large constant")],
+                       "An enum to set size") #discription
+#The add function adds a parameter to the list of parameters
+      # name    type level  description          default value  min_value  max_value  edit_method(drop-down box selection)
+gen.add("size", int_t, 0, "A size parameter which is edited via an enum", 1, 0, 3, edit_method=size_enum)
+#tells the generator to generate the necessary files and exit the program.
+#                   packagename   node name    prefix name 
+exit(gen.generate(PACKAGE_NAME , NODE_NAME , GENERATE_FILE_PREFIX_NAME))
+```
+
+	为文件添加可执行权限  a：所有的用户  + 添加  x：execute 执行权限
+	chmod a+x cfg/Tutorials.cfg
+
+
+ 修改 CMakeLists.txt 文件
+  
+	#add dynamic reconfigure api
+	#find_package(catkin REQUIRED dynamic_reconfigure)
+	generate_dynamic_reconfigure_options(
+	  cfg/Tutorials.cfg
+	  #...
+	)
+	# make sure configure headers are built before any node using them
+	add_dependencies(example_node ${PROJECT_NAME}_gencfg)
+	  注意  example_node为需要使用 动态配置文件的节点名
+
+建立一个节点
+
+//dynamic_config_server.cpp
+```c
+#include <ros/ros.h>//系统文件
+#include <dynamic_reconfigure/server.h> //参数动态更新服务器
+#include <dynamic_param_reconfig/TutorialsConfig.h> //.cfg文件 生成的头文件
+// 参数一经更改 会调用 该毁掉函数修改相应参数
+void callback(dynamic_tutorials::TutorialsConfig &config, uint32_t level) {
+  //鼠标选定点击滑动等操作改变参数松开后 调用此函数想控制台发送信息
+  ROS_INFO("Reconfigure Request: %d %f %s %s %d", 
+            config.int_param, config.double_param, //整形参数 浮点型参数
+            config.str_param.c_str(),              //字符串型参数
+            config.bool_param?"True":"False",      //布尔型参数
+            config.size); }                        //大小
+
+int main(int argc, char **argv) {
+   //初始化ros系统 注册节点  节点名 
+   ros::init(argc, argv, "dynamic_tutorials");
+   //定义动态参数调整服务器
+   dynamic_reconfigure::Server<dynamic_tutorials::TutorialsConfig> server;
+   //定义动态参数调节回调函数 重载回调函数
+   dynamic_reconfigure::Server<dynamic_tutorials::TutorialsConfig>::CallbackType f;
+   f = boost::bind(&callback, _1, _2);
+   server.setCallback(f);//设置回调函数
+   ROS_INFO("Spinning node"); //开始主循环
+   ros::spin();
+   return 0;
+  }
+```
