@@ -1,0 +1,69 @@
+
+> a. 查看节点提供的服务
+
+	查看某个节点的服务类型 要查看一个特定节点提供的服务,使用 rosnode info 命令:
+	  rosnode info node-name
+
+	下面的例子给出了这条命令在 turtlesim 节点上输出结果的相应部分:
+	roscore                               master 节点
+	rosrun turtlesim turtlesim_node       小乌龟 节点
+	rosnode info /turtlesim
+	>>>>>>>>>
+
+	Services:
+	*/turtle1/teleport_absolute
+	*/turtlesim/get_loggers
+	*/turtlesim/set_logger_level
+	*/reset
+	*/spawn
+	*/clear
+	*/turtle1/set_pen
+	*/turtle1/teleport_relative
+	*/kill
+	
+> b. 查看服务类型 与 其数据详情
+
+	查找提供服务的节点 要完成这个反向查询,即查找提供给定服务的节点,可以使用这条指令:
+	rosservice node service-name
+
+	rosservice type service-name     服务数据类型
+	rosservice type /clear    -------->>>>  std_srvs/Empty
+
+	rosservice type  /spawn   -------->>>> turtlesim/Spawn 
+
+	   rosservice info service-name  参数信息
+	   rosservice info /spawn
+	   --->>
+	    -------->>>>>
+
+	Node: /turtlesim
+	URI: rosrpc://ewenwan-Lenovo-G480:33246
+	Type: turtlesim/Spawn                      #服务的数据类型
+	Args: x y theta name
+
+	turtlesim + Spawn ⇒ turtlesim/Spawn
+	功能包名     类型名    服务数据类型
+
+	查看服务数据类型 详情
+	当服务的数据类型已知时,我们可以使用rossrv 指令来获得此服务数据类型的详情:
+	rossrv show service-data-type-name
+	      查看服务数据类型
+	      rossrv  同   rostopic 的消息类型查看  rosmsg show 一样
+
+	      rossrv show service-data-type-name    
+
+	      rossrv show turtlesim/Spawn
+
+	      rosservice type  /spawn | rossrv show   管道命令
+	---->>>>>>
+	float32 x    #短横线(---)之前的数据是请求项,这是客户节点发送到服务节点的信息。
+	float32 y        #request    新生成 小海龟的位置   x,y
+	float32 theta    朝向角度
+	string name      名字
+	---
+	string name     #response
+	#短横线之后的所有字段是响应项,或者说是服务节点完成请求后发送回请求节点的信息
+
+			     Topics           Services
+	active things        rostopic         rosservice 查询话题/服务用   
+	data types           rosmsg           rossrv     查询消息/服务数据类型用
