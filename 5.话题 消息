@@ -1,0 +1,146 @@
+> a ROS话题的信息查询
+
+	rostopic
+
+	rostopic -h
+
+	rostopic list
+	rostopic list -h  //查看 help
+
+	rostopic list -v    //查看全部话题消息类型。。。
+	rostopic list -p    //发布的消息
+	rostopic list -s    //订阅的消息
+
+	rostopic hz topic-name  #测量消息发布频率   输出每秒发布的消息数量
+	rostopic bw topic-name  #测量消息占用宽带 Kb/s 输出每秒发布消息所占的字节量
+
+	即使你一点都不关心这个特定的频率,但是这些命令对调
+	试很有帮助,因为它们提供了一种简单的方法来验证这些
+	消息确实有规律地在向这些特定的话题发布
+
+> b 查看话题上发布的数据
+
+	rostopic echo [topic]       持续查看更新话题上发布的数据
+	rostopic echo /turtle1/cmd_vel
+
+	查询话题  信息参数
+	rostopic info topic-name  
+	# 利用 rostopic info 命令, 可以获取更多关于话题信息类型等参数:
+
+	rostopic info /turtle1/color_sensor
+	输出中最重要的部分是第一行,给出了该话题的消息类型。
+	因此 , 在/turtle1/color_sensor 话题中发布 订阅的消 息类 型是
+	/turtlesim/Color。Type 在文本输出中表示数据类型
+
+	话题上发布消息类型的命名 :   
+	消息类型名总会包含一个斜杠,斜杠前面的名字是包含它的包:
+	package-name/type-name
+	1 避免命名冲突。
+	2 依赖关系看上去更明朗
+	3 有助于猜测它的含义
+
+        查看消息数据类型：
+	rosmsg show  /turtlesim/Color    
+	uint8 r
+	uint8 g
+	uint8 b
+
+	上述输出的格式是域(field)的列表,每行一个元素。每一
+	个域由基本数据类型(例如 int8、bool、或者 string)以及域名称
+	定义。上述输出告诉我们 turtlesim/Color 包含三个无符号 8 位整型变量 r,g 和 b。
+	任何话题的消息只要是 turtlesim/Color 类型,
+	都由上述三个域的值定义。
+
+	rostopic info /turtle1/cmd_vel  话题上发布的消息类型
+	Type: geometry_msgs/Twist
+	
+	rosmsg show geometry_msgs/Twist 消息 的具体数据格式
+	geometry_msgs/Vector3 linear    # 线速度  沿x y z轴的直线数度
+	float64 x
+	float64 y
+	float64 z
+	geometry_msgs/Vector3 angular   # 角速度  沿 x y z轴的旋转叫速度 俯仰 偏行 滚转
+	float64 x
+	float64 y
+	float64 z
+
+	该 例 中 , linear 和 angular 都 是 复 合 域 , 其 数 据 类 型 是
+	geometry_msgs/Vector3。缩进格式表示命名为 x,y 和 z 的域是对
+	应的上级两个域之一的成员。也就是说,geometry_msgs/Twist 消
+	息包含六个成员,并且以两个向量的形式组织,分别为 linear 和angular。
+	其中每个数值都是基本数据类型 float64,即每个数值都是 64 位浮点型数据。
+
+	rosmsg show 命令在显示消息类型时自动向下展
+	开复合域直到基本类型为止,同时使用缩进的形式来展示这种嵌套结构
+
+
+> c 查看所发布话题的消息类型
+
+	rostopic type [topic]
+
+	rostopic type /turtle1/cmd_vel
+
+	rosmsg show 消息类型
+	rosmsg show message-type-name
+
+	rosmsg show geometry_msgs/Twist
+
+	rostopic type /turtle1/cmd_vel | rosmsg show   管道命令
+
+> d 把数据发布到当前某个正在广播的话题上
+
+	大多数时候,发布消息的工作是由特定的程
+	序完成的 * 。但是,你会发现有时候手动发布消息是很实用的。
+	要实现该功能,利用rostopic命令行工具
+
+	rostopic pub –r rate-in-hz topic-name message-type message-content
+		          频率       话题名字    消息类型    消息的参数值
+
+	此处展示的命令 利用了 -r 来指定话题以频率 rate 模式发布消息,
+	即以一定的时间周期发布消息。
+	
+	这条命令同样支持一次性发布的模式(-1“虚线后为数字 1”)和
+	特别的锁存模式(-l“虚线后为字母 L 的小写”),
+	锁存模式虽然也只是发布一次消息,
+	但是会确保该话题的新订阅者也会收到消息。实际上,锁存模式是默认的模式。
+
+	同样也可以从文件中读取消息(利用-f 参数)
+	或者从标准的输入(把-f 参数和消息的内容从命令中都删掉)中读取。
+	两种情况下,输入应该符合 rostopic echo 的输出格式。
+
+	1次/1秒频率发布   位移线速度为2 直线行走 前进
+	rostopic pub -r 1 /turtle1/cmd_vel geometry_msgs/Twist ’[2,0,0]’ ’[0,0,0]’
+
+	1次/1秒频率发布   位移线速度为2 直线行走 倒退
+	rostopic pub -r 1 /turtle1/cmd_vel geometry_msgs/Twist ’[-2,0,0]’ ’[0,0,0]’
+
+	1次/1秒频率发布   角速度为2 逆时针旋转  逆正顺负
+	rostopic pub -r 1 /turtle1/cmd_vel geometry_msgs/Twist ’[0,0,0]’ ’[0,0,2]’
+
+	1次/1秒频率发布   角速度为2 顺时针旋转
+	rostopic pub -r 1 /turtle1/cmd_vel geometry_msgs/Twist ’[0,0,0]’ ’[0,0,-2]’
+
+	事实上,上述两个例子中的非零域——位移 linear.x  ’[-2,0,0]’ 以及角
+	度 angular.z   ’[0,0,2]’  ——是 turtlesim 重点关注的两个变量,
+	而这两个变量是 geometry_msgs/Twist 消息中仅有的两个变量。
+	因为其他四个变量表示的运动对于该二维仿真来说是不可能发生的,
+	所以 turtlesim 程序忽略了这些变量。
+	
+	rostopic pub [topic] [msg_type] [args]
+	rostopic pub -1 /turtle1/cmd_vel geometry_msgs/Twist -- '[2.0, 0.0, 0.0]' '[0.0, 0.0, 1.8]'        //转一圈
+
+	rostopic pub /turtle1/cmd_vel geometry_msgs/Twist -r 1 -- '[2.0, 0.0, 0.0]' '[0.0, 0.0, 1.8]'        //一直转
+
+	话题通信的 多对多机制：
+	rosrun turtlesim turtlesim_node __name:=A
+	rosrun turtlesim turtlesim_node __name:=B
+	rosrun turtlesim turtle_teleop_key __name:=C
+	rosrun turtlesim turtle_teleop_key __name:=D
+	遥控节点之一发送按键命令时,两个海龟都会有同样的运动来响应
+
+	节点之间的松耦合关系：
+	“生产”消息的程序(例如 turtle_teleop_key)只管发布该消息,
+	而不用关心该消息是如何被“消费”的。
+	“消费”消息的程序(例如 turtlesim_node)只管订阅该话题或
+	者它所需要消息的所有话题,而不用关心这些消息数据是如何“生产”的。
+
